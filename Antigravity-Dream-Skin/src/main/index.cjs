@@ -22,6 +22,10 @@ const SAVEABLE_KEYS = [
   "videoMuted",
   "videoPlaybackRate",
   "videoPaused",
+  "widgetAutoLaunch",
+  "widgetHideTray",
+  "glass",
+  "font",
 ];
 
 const dataDir =

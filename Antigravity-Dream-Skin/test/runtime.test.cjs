@@ -33,8 +33,11 @@ function fixture(){
     const payload=JSON.parse(expression.slice(expression.lastIndexOf(")({")+2,-1));
     applied.push(payload);
     if(blockApply){const gate=blockApply;blockApply=null;await gate;}
-    state={themed:true,owner:payload.owner};
+    state={themed:true,owner:payload.owner,rev:7};
     return {applied:true};
+   }
+   if(expression.includes("touch?.()")){
+    return true;
    }
    if(expression.includes("destroy()")){
     if(!expression.includes("===")||state.owner===controller.owner){writes.push("destroy");state={themed:false};}
@@ -294,4 +297,150 @@ test('installTheme mounts looping video element, preserves element across style 
  }finally{
   Object.assign(global,origGlobals);
  }
+});
+
+test('DreamSkinSettings sanitizes glass regions, themeStyle, radius, veil, font colors, and merges partial updates cleanly',()=>{
+ const file=path.join(fs.mkdtempSync(path.join(os.tmpdir(),'dream-glass-set-')),'settings.json');
+ const s=new DreamSkinSettings(file);
+ assert.equal(s.getAll().glass.themeStyle,'star-neko');
+ assert.equal(s.getAll().glass.radius,16);
+ s.update({
+  widgetHideTray:true,
+  glass:{
+   themeStyle:'official',
+   tint:'#38BDF8',
+   veil:120,
+   radius:99,
+   regions:{sidebar:{fill:88,blur:10},overlay:{fill:-5,blur:99}}
+  },
+  font:{
+   accent:'#6366F1',
+   darkSeparate:true,
+   colors:{main:'#FBF9F9',secondary:'invalid',muted:'#FDFDFD',faint:'#FFFFFF'},
+   colorsDark:{main:'#EAEBF1',secondary:'#A8A9B2'}
+  }
+ });
+ s.update({glass:{veil:35,radius:12},font:{colors:{secondary:'#E2E8F0'}}});
+ const reloaded=new DreamSkinSettings(file).getAll();
+ assert.equal(reloaded.widgetHideTray,true);
+ assert.equal(reloaded.glass.themeStyle,'official');
+ assert.equal(reloaded.glass.tint,'#38bdf8');
+ assert.equal(reloaded.glass.veil,35);
+ assert.equal(reloaded.glass.radius,12);
+ assert.equal(reloaded.glass.regions.sidebar.fill,88);
+ assert.equal(reloaded.glass.regions.sidebar.blur,10);
+ assert.equal(reloaded.glass.regions.overlay.fill,0);
+ assert.equal(reloaded.glass.regions.overlay.blur,40);
+ s.update({glass:{radius:2}});
+ assert.equal(s.getAll().glass.radius,8);
+ assert.equal(reloaded.font.accent,'#6366f1');
+ assert.equal(reloaded.font.darkSeparate,true);
+ assert.equal(reloaded.font.colors.main,'#fbf9f9');
+ assert.equal(reloaded.font.colors.secondary,'#e2e8f0');
+ assert.equal(reloaded.font.colorsDark.main,'#eaebf1');
+});
+
+test('installTheme takes over official Antigravity glass/font vars and styles slash menu cleanly without transparence leak',async()=>{
+ const {installTheme}=require('../src/host/theme.cjs');
+ function makeEl(tag){
+  const attrs=new Map(),children=[];
+  const el={
+   tagName:tag.toUpperCase(),
+   id:'',
+   textContent:'',
+   children,
+   isConnected:true,
+   parentElement:null,
+   style:{
+    _props:{},
+    setProperty(k,v){this._props[k]=v;},
+    getPropertyValue(k){return this._props[k]||'';},
+    getPropertyPriority(){return '';},
+    removeProperty(k){delete this._props[k];}
+   },
+   setAttribute(k,v){if(k==='id')el.id=v;attrs.set(k,String(v));},
+   getAttribute(k){return attrs.get(k)??null;},
+   hasAttribute(k){return attrs.has(k);},
+   removeAttribute(k){attrs.delete(k);},
+   addEventListener(){},
+   append(...nodes){for(const n of nodes){n.parentElement=el;children.push(n);}},
+   prepend(...nodes){for(const n of nodes){n.parentElement=el;children.unshift(n);}},
+   remove(){el.isConnected=false;if(el.parentElement){const i=el.parentElement.children.indexOf(el);if(i>=0)el.parentElement.children.splice(i,1);}},
+   matches(){return false;},
+   closest(){return null;},
+   contains(target){return target===el||children.some(c=>c.contains?.(target));},
+   querySelector(){return null;},
+   querySelectorAll(){return [];},
+   getBoundingClientRect(){return {left:0,top:0,width:1280,height:720,right:1280,bottom:720};},
+   classList:{add(){},remove(){},contains(){return false;}}
+  };
+  return el;
+ }
+ const rootEl=makeEl('div');rootEl.id='root';
+ const bodyEl=makeEl('body');bodyEl.append(rootEl);
+ const headEl=makeEl('head');
+ const docEl=makeEl('html');
+ const origGlobals={window:global.window,document:global.document,getComputedStyle:global.getComputedStyle,MutationObserver:global.MutationObserver,ResizeObserver:global.ResizeObserver,innerWidth:global.innerWidth,innerHeight:global.innerHeight};
+ try{
+  global.window={};
+  global.document={documentElement:docEl,head:headEl,body:bodyEl,createElement:tag=>makeEl(tag),querySelector:sel=>sel==='#root'?rootEl:null,querySelectorAll:()=>[]};
+  global.getComputedStyle=()=>({backgroundColor:'rgb(0, 0, 0)',backgroundImage:'none'});
+  global.MutationObserver=class{observe(){}disconnect(){}};
+  global.ResizeObserver=class{observe(){}unobserve(){}disconnect(){}};
+  global.innerWidth=1280;
+  global.innerHeight=720;
+
+  await installTheme({
+   owner:'glass-owner',
+   outputMode:'glass',
+   image:'data:image/png;base64,AA==',
+   glass:{themeStyle:'star-neko',tint:'#ffffff',veil:50,radius:20,regions:{sidebar:{fill:0,blur:0},content:{fill:0,blur:6},overlay:{fill:0,blur:12},control:{fill:0,blur:12},header:{fill:0,blur:0},bar:{fill:0,blur:12}}},
+   font:{accent:'#ea00ff',darkSeparate:false,colors:{main:'#fbf9f9',secondary:'#ffffff',muted:'#fdfdfd',faint:'#ffffff'},colorsDark:{}}
+  });
+  const baseCss=headEl.children.find(c=>c.id==='agy-dream-style-v2')?.textContent||'';
+  const tokenCss=headEl.children.find(c=>c.id==='agy-dream-tokens-v2')?.textContent||'';
+  assert.equal(rootEl.getAttribute('data-agy-theme-style'),'star-neko');
+  assert.match(baseCss,/\[data-mention-menu\]/);
+  assert.match(baseCss,/\[data-agy-theme-style="star-neko"\]/);
+  assert.doesNotMatch(baseCss,/\.surface-composer[^\n]*\*:not\([^)]*\) \{background-color:transparent!important/);
+  assert.match(baseCss,/\[data-mention-menu\][\s\S]*backdrop-filter/);
+  assert.match(baseCss,/\[data-testid="sidecar-iframe-slot"\][\s\S]*backdrop-filter:\s*none\s*!important/);
+  assert.match(baseCss,/\.surface-composer\s*\{[\s\S]*overflow:\s*visible\s*!important/);
+  assert.match(baseCss,/\.surface-composer\s*>\s*\.surface-composer-card[\s\S]*overflow:\s*hidden\s*!important/);
+  assert.match(baseCss,/\.surface-composer[\s\S]*\[data-lexical-editor="true"\][\s\S]*background-color:\s*transparent\s*!important/);
+  assert.match(baseCss,/\.bg-sidebar[\s\S]*backdrop-filter:\s*none\s*!important/);
+  assert.match(baseCss,/\[data-selected="true"\]/);
+  assert.match(tokenCss,/--lg-filter-sidebar:\s*none/);
+  assert.match(tokenCss,/--agy-glass-radius:\s*20px/);
+  assert.match(tokenCss,/--agy-radius-outer:/);
+  assert.match(tokenCss,/--foreground:\s*#fbf9f9/);
+  assert.match(tokenCss,/--secondary-foreground:\s*#ffffff/);
+  assert.match(tokenCss,/--muted-foreground:\s*#fdfdfd/);
+  assert.match(tokenCss,/--placeholder:\s*#ffffff/);
+  assert.match(tokenCss,/--primary:\s*#ea00ff/);
+  assert.match(tokenCss,/--glass:/);
+  global.window.__agyDreamSkinV2.update({
+   owner:'glass-owner',
+   outputMode:'glass',
+   image:'data:image/png;base64,AA==',
+   glass:{themeStyle:'official',tint:'#ffffff',veil:50,radius:12,regions:{sidebar:{fill:0,blur:0},content:{fill:0,blur:6},overlay:{fill:0,blur:12},control:{fill:0,blur:12},header:{fill:0,blur:0},bar:{fill:0,blur:12}}},
+   font:{accent:'#ea00ff',darkSeparate:false,colors:{main:'#fbf9f9',secondary:'#ffffff',muted:'#fdfdfd',faint:'#ffffff'},colorsDark:{}}
+  });
+  assert.equal(rootEl.getAttribute('data-agy-theme-style'),'official');
+  assert.match(headEl.children.find(c=>c.id==='agy-dream-tokens-v2')?.textContent||'',/--agy-glass-radius:\s*12px/);
+  global.window.__agyDreamSkinV2.destroy();
+  assert.equal(headEl.children.some(c=>c.id==='agy-dream-tokens-v2'),false);
+ }finally{
+  Object.assign(global,origGlobals);
+ }
+});
+
+test('stale orphaned skin from crashed sidecar is reclaimed while live other owner stays untouched',async()=>{
+ const f=fixture();
+ f.setState({themed:true,owner:'dead-pid-owner',rev:2,stale:true});
+ await f.controller.update({enabled:true,fit:'contain',scrim:12});
+ assert.equal(f.writes.length,1);
+ assert.equal(f.applied.length,1);
+ assert.equal(f.controller.status.applied,true);
+ await f.controller.stop();
 });

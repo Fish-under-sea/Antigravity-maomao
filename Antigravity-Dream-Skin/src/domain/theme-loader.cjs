@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const { detectMediaKind, mimeTypeForPath } = require("./media-server.cjs");
+const { DEFAULT_GLASS, DEFAULT_FONT } = require("./settings.cjs");
 
 class DreamSkinThemeLoader {
   constructor(options = {}) {
@@ -109,6 +110,8 @@ class DreamSkinThemeLoader {
       videoMuted: settings.videoMuted !== false,
       videoPlaybackRate: Math.max(0.25, Math.min(2, settings.videoPlaybackRate ?? 1)),
       videoPaused: Boolean(settings.videoPaused),
+      glass: settings.glass || DEFAULT_GLASS,
+      font: settings.font || DEFAULT_FONT,
     };
 
     const mode = settings.mediaType || "preset";

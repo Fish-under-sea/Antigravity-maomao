@@ -2,7 +2,7 @@ const { discover, Cdp } = require("../../../shared/host.cjs");
 const { installTheme } = require("../host/theme.cjs");
 class HostController {
   constructor(loader, onStatus, options = {}) {
-    this.owner = require("node:crypto").randomUUID();
+    this.owner = options.owner || require("node:crypto").randomUUID();
     this.loader = loader;
     this.onStatus = onStatus;
     this.discover = options.discover || discover;
@@ -46,28 +46,32 @@ class HostController {
         this.signature = null;
       }
       const current = await this.client.evaluate(
-        "({ready:document.readyState,themed:!!window.__agyDreamSkinV2?.status().applied,owner:window.__agyDreamSkinV2?.owner})"
+        "({ready:document.readyState,themed:!!window.__agyDreamSkinV2?.status().applied,owner:window.__agyDreamSkinV2?.owner,rev:window.__agyDreamSkinV2?.rev||0,stale:typeof window.__agyDreamSkinV2?.lastSeen==='number'&&(Date.now()-window.__agyDreamSkinV2.lastSeen>15000)})"
       );
       if (revision !== this.revision || this.stopping) return;
       if (!settings.enabled) {
-        if (current.themed && current.owner === this.owner) {
+        if (current.themed && (current.owner === this.owner || current.stale)) {
           await this.client.evaluate("window.__agyDreamSkinV2?.destroy()");
         }
         this.signature = null;
         this.report({
           connected: true, applied: false,
-          message: current.themed && current.owner !== this.owner
+          message: current.themed && current.owner !== this.owner && !current.stale
             ? "已连接 · 当前实例未启用，另一个皮肤实例正在运行"
             : "已连接 · 皮肤已关闭，宿主恢复原样"
         });
         return;
       }
-      if (current.themed && current.owner !== this.owner) {
+      if (current.themed && current.owner !== this.owner && !current.stale) {
         this.report({ connected: true, applied: false, message: "已连接 · 皮肤由另一个运行实例管理" });
         return;
       }
+      if (current.themed && (current.stale || current.owner !== this.owner)) {
+        await this.client.evaluate("window.__agyDreamSkinV2?.destroy()");
+        this.signature = null;
+      }
       const signature = JSON.stringify(settings);
-      if (!current.themed || signature !== this.signature) {
+      if (!current.themed || current.stale || current.rev !== 7 || signature !== this.signature) {
         const payload = { ...this.loader.payload(settings), owner: this.owner };
         const result = await this.client.evaluate("(" + installTheme.toString() + ")(" + JSON.stringify(payload) + ")");
         this.signature = signature;
@@ -75,6 +79,8 @@ class HostController {
           connected: true, ...result,
           message: result.applied ? "已应用到真实 Antigravity · 可随时关闭" : "宿主布局已变化，等待重新应用"
         });
+      } else if (current.owner === this.owner) {
+        await this.client.evaluate("window.__agyDreamSkinV2?.touch?.()");
       }
     } catch (error) {
       this.client?.close();
