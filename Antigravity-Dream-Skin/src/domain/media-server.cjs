@@ -113,9 +113,11 @@ class LocalMediaServer {
   }
 
   #pipeFile(approved, res, range) {
-    const stream = range
-      ? fs.createReadStream(approved, { start: range.start, end: range.end })
-      : fs.createReadStream(approved);
+    // Use 256 KB sequential chunks so 4K 60fps streams sustain bitrate with fewer syscalls
+    const streamOpts = range
+      ? { start: range.start, end: range.end, highWaterMark: 262144 }
+      : { highWaterMark: 262144 };
+    const stream = fs.createReadStream(approved, streamOpts);
     const cleanup = () => {
       if (!stream.destroyed) stream.destroy();
     };
@@ -131,7 +133,6 @@ class LocalMediaServer {
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Range");
-    res.setHeader("Cache-Control", "no-store");
 
     if (req.method === "OPTIONS") {
       res.writeHead(204);
@@ -176,7 +177,16 @@ class LocalMediaServer {
 
     const contentType = mimeTypeForPath(approved);
     const total = stat.size;
+    const etag = `W/"${total}-${Math.trunc(stat.mtimeMs)}"`;
+    // Private short cache lets Chromium reuse buffered media blocks on loop boundaries without exposing public proxies
+    res.setHeader("Cache-Control", "private, max-age=3600");
+    res.setHeader("ETag", etag);
     const rangeHeader = req.headers.range;
+    if (!rangeHeader && req.headers["if-none-match"] === etag) {
+      res.writeHead(304, { "Accept-Ranges": "bytes", ETag: etag });
+      res.end();
+      return;
+    }
     if (rangeHeader) {
       const parsed = parseByteRange(rangeHeader, total);
       if (!parsed || parsed.invalid) {

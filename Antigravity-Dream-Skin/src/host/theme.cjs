@@ -1,7 +1,7 @@
 // Serialized into the host by its existing local CDP endpoint. No app files are modified.
 async function installTheme(config) {
   const key = "__agyDreamSkinV2";
-  const THEME_REV = 9;
+  const THEME_REV = 10;
   if (window[key]) {
     if (window[key].owner && window[key].owner !== config.owner) {
       const dead = typeof window[key].lastSeen === "number" && Date.now() - window[key].lastSeen > 15000;
@@ -105,7 +105,23 @@ async function installTheme(config) {
     const popMix = dark
       ? `color-mix(in srgb, ${glassTintVar} ${starNeko ? "11%" : "13%"}, ${popBaseHex})`
       : `color-mix(in srgb, ${glassTintVar} 26%, ${popBaseHex})`;
-    const makeFilter = (px) => (px > 0 ? `blur(${px}px) saturate(165%)` : "none");
+    const smoothVideo = cfg.mediaKind === "video" && cfg.videoSmoothMode !== false;
+    // During active video wallpapers, omit extra saturate() pass and cap full-pane blur to keep 60fps smooth
+    const makeFilter = (px, maxSmooth = 0) => {
+      if (px <= 0) return "none";
+      if (smoothVideo) {
+        const capped = maxSmooth > 0 ? Math.min(px, maxSmooth) : px;
+        return `blur(${capped}px)`;
+      }
+      return `blur(${px}px) saturate(165%)`;
+    };
+
+    const rawChatWidth = localChatWidth !== null ? localChatWidth : cfg.chatWidth;
+    const chatWidth = clampInt(rawChatWidth, 0, 0, 100);
+    const chatWidthRules =
+      chatWidth >= 45
+        ? `\n  --agy-chat-width: clamp(480px, ${chatWidth}%, calc(100% - var(--overview-panel-reserve, 0px) - var(--conversation-nav-reserve, 0px) - 36px));\n  --max-conversation-width: var(--agy-chat-width) !important;`
+        : "";
 
     const f = cfg.font || {};
     const accent = cleanHex(f.accent);
@@ -199,12 +215,12 @@ async function installTheme(config) {
   --agy-glass-header-blur: ${hdBlur}px;
   --agy-glass-bar-fill: ${brFill}%;
   --agy-glass-bar-blur: ${brBlur}px;
-  --lg-filter-sidebar: ${makeFilter(sbBlur)};
-  --lg-filter-content: ${makeFilter(ctBlur)};
-  --lg-filter-overlay: ${ovBlur > 0 ? makeFilter(Math.max(ovBlur, 12)) : "none"};
-  --lg-filter-control: ${makeFilter(clBlur)};
-  --lg-filter-header: ${makeFilter(hdBlur)};
-  --lg-filter-bar: ${makeFilter(brBlur)};
+  --lg-filter-sidebar: ${makeFilter(sbBlur, 10)};
+  --lg-filter-content: ${makeFilter(ctBlur, 10)};
+  --lg-filter-overlay: ${ovBlur > 0 ? makeFilter(Math.max(ovBlur, 12), 14) : "none"};
+  --lg-filter-control: ${makeFilter(clBlur, 12)};
+  --lg-filter-header: ${makeFilter(hdBlur, 10)};
+  --lg-filter-bar: ${makeFilter(brBlur, 10)};
   /* 接管 Antigravity 官方玻璃与区域令牌，避免与官方系统两套打架 */
   --glass: color-mix(in srgb, var(--lg-pop-surface) var(--agy-glass-content-fill), transparent) !important;
   --glass-border: var(--lg-rim-line) !important;
@@ -218,7 +234,7 @@ async function installTheme(config) {
   --secondary: var(--lg-control-bg) !important;
   --border: var(--lg-rim-line) !important;
   --card: color-mix(in srgb, var(--lg-surface) var(--agy-glass-content-fill), transparent) !important;
-  --shell: color-mix(in srgb, var(--lg-surface) var(--agy-glass-header-fill), transparent) !important;
+  --shell: color-mix(in srgb, var(--lg-surface) var(--agy-glass-header-fill), transparent) !important;${chatWidthRules}
   ${baseFontLines.join("\n  ")}
 }`;
 
@@ -293,7 +309,137 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
  html.agy-dream-active-v2 :not(pre) > code[data-agy-dream-protect] {
    border-radius: var(--agy-radius-badge, 6px) !important;
  }
- html.agy-dream-active-v2 [data-agy-dream-fade] { background: none !important; box-shadow: none !important; }
+ html.agy-dream-active-v2 [data-agy-dream-fade],
+ html.agy-dream-active-v2 [data-agy-dream-root] :is(.pointer-events-none, [data-agy-dream-fade]):is([style*="linear-gradient"], [style*="var(--background)"], [style*="var(--sidebar)"]) {
+   background: transparent !important;
+   background-image: none !important;
+   box-shadow: none !important;
+ }
+ html.agy-dream-active-v2 .md-sticky-message-bleed::before,
+ html.agy-dream-active-v2 .md-sticky-message-bleed::after {
+   background: transparent !important;
+   background-image: none !important;
+   box-shadow: none !important;
+ }
+ html.agy-dream-active-v2 :is(.bg-sidebar, aside, [role=navigation]) :is(.agy-row-actions, .agy-row-actions::before, .agy-status-overflow, .sticky) {
+   background: transparent !important;
+   background-image: none !important;
+ }
+ html.agy-dream-active-v2 .agy-sheet :is(.bg-background, [class*="from-background"], [class*="to-background"], [class*="via-background"]):not(.monaco-editor, .monaco-editor *, .xterm, .xterm *, pre, pre *, code, code *, [role=dialog], [role=dialog] *, [role=menu], [role=menu] *, [data-mention-menu], [data-mention-menu] *, [data-popover-popup], [data-popover-popup] *) {
+   background-color: transparent !important;
+   background-image: none !important;
+ }
+ /* 细窄滚动条：统一收敛宿主叠加滚动条与原生 WebKit 滚动条，避免粗重胶囊遮挡正文 */
+ html.agy-dream-active-v2 [data-overlay-scrollbar-track],
+ html.agy-dream-active-v2 [data-testid="overlay-scrollbar"] {
+   width: 6px !important;
+   padding: 0 !important;
+   margin: 0 !important;
+   background: transparent !important;
+   background-image: none !important;
+   -webkit-backdrop-filter: none !important;
+   backdrop-filter: none !important;
+   box-shadow: none !important;
+   border: 0 !important;
+ }
+ html.agy-dream-active-v2 [data-overlay-scrollbar-track][data-orientation="horizontal"],
+ html.agy-dream-active-v2 [data-testid="overlay-scrollbar"][data-orientation="horizontal"] {
+   width: auto !important;
+   height: 6px !important;
+ }
+ html.agy-dream-active-v2 [data-testid="overlay-scrollbar-thumb"] {
+   width: 3px !important;
+   max-width: 3px !important;
+   min-width: 0 !important;
+   padding: 0 !important;
+   margin: 0 !important;
+   border: 0 !important;
+   border-radius: 9999px !important;
+   -webkit-backdrop-filter: none !important;
+   backdrop-filter: none !important;
+   box-shadow: none !important;
+   background-color: color-mix(in srgb, var(--foreground) 24%, transparent) !important;
+ }
+ html.agy-dream-active-v2 [data-overlay-scrollbar-track][data-orientation="horizontal"] [data-testid="overlay-scrollbar-thumb"] {
+   width: auto !important;
+   max-width: none !important;
+   height: 3px !important;
+   max-height: 3px !important;
+ }
+ html.agy-dream-active-v2 [data-overlay-scrollbar-track]:is([data-expanded="true"], [data-hovered="true"], :hover) [data-testid="overlay-scrollbar-thumb"] {
+   width: 4px !important;
+   max-width: 4px !important;
+   background-color: color-mix(in srgb, var(--foreground) 46%, transparent) !important;
+ }
+ html.agy-dream-active-v2 [data-overlay-scrollbar-track][data-orientation="horizontal"]:is([data-expanded="true"], [data-hovered="true"], :hover) [data-testid="overlay-scrollbar-thumb"] {
+   width: auto !important;
+   max-width: none !important;
+   height: 4px !important;
+   max-height: 4px !important;
+ }
+ html.agy-dream-active-v2 ::-webkit-scrollbar {
+   width: 4px !important;
+   height: 4px !important;
+ }
+ html.agy-dream-active-v2 ::-webkit-scrollbar-track,
+ html.agy-dream-active-v2 ::-webkit-scrollbar-corner {
+   background: transparent !important;
+ }
+ html.agy-dream-active-v2 ::-webkit-scrollbar-thumb {
+   background: color-mix(in srgb, var(--foreground) 24%, transparent) !important;
+   border-radius: 9999px !important;
+   border: 0 !important;
+ }
+ html.agy-dream-active-v2 ::-webkit-scrollbar-thumb:hover {
+   background: color-mix(in srgb, var(--foreground) 44%, transparent) !important;
+ }
+ /* 会话流与输入框宽度适配 + 左右边缘拖动把手 */
+ html.agy-dream-active-v2[data-agy-chat-width="custom"] [data-testid="conversation-view"] [style*="--max-conversation-width"] {
+   max-width: var(--agy-chat-width) !important;
+ }
+ html.agy-dream-active-v2 .agy-dream-width-handle {
+   position: absolute;
+   top: 8px;
+   bottom: 8px;
+   width: 10px;
+   z-index: 40;
+   cursor: ew-resize;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   touch-action: none;
+   user-select: none;
+ }
+ html.agy-dream-active-v2 .agy-dream-width-handle[data-side="left"] { left: -6px; }
+ html.agy-dream-active-v2 .agy-dream-width-handle[data-side="right"] { right: -6px; }
+ html.agy-dream-active-v2 .agy-dream-width-handle::after {
+   content: "";
+   width: 2px;
+   height: 28px;
+   border-radius: 9999px;
+   background: color-mix(in srgb, var(--foreground) 24%, transparent);
+   opacity: 0.25;
+   transition: opacity 120ms ease, height 120ms ease, background-color 120ms ease;
+ }
+ html.agy-dream-active-v2 .agy-dream-width-handle:is(:hover, [data-dragging="1"])::after {
+   opacity: 0.95;
+   height: 40px;
+   background: var(--primary, #a88ee5);
+ }
+ #agy-dream-width-badge {
+   position: fixed;
+   z-index: 99999;
+   padding: 4px 10px;
+   border-radius: 9999px;
+   font-size: 11px;
+   font-weight: 600;
+   color: #fff;
+   background: rgba(18, 16, 28, 0.88);
+   border: 1px solid rgba(255, 255, 255, 0.22);
+   pointer-events: none;
+   transform: translate(-50%, -120%);
+   white-space: nowrap;
+ }
  html.agy-dream-active-v2 [data-agy-dream-welcome] { padding-top: 0 !important; justify-content: flex-end !important; padding-bottom: 28px !important; }
  html.agy-dream-active-v2 .agy-inset-shell { background-color: transparent !important; }
  /* 左侧/顶部面板利用外扩同色凹角阴影无缝填补 .agy-sheet 四角圆角空缺，消除 1px 缝隙与内层重影线 */
@@ -430,6 +576,9 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
    backdrop-filter: var(--lg-filter-content, blur(22px) saturate(165%)) !important;
    border-radius: var(--agy-radius-card, 16px) !important;
    box-shadow: inset 0 1px 0 var(--lg-rim-inset-top), inset 0 -1px 0 var(--lg-rim-shade), inset 0 0 0 1px var(--lg-rim-line);
+ }
+ html.agy-dream-active-v2 :is(.agy-card, .artifact-card, .agy-user-bubble, .agy-takeover-card),
+ html.agy-dream-active-v2 [data-agy-output-mode="glass"] [data-agy-dream-segment] {
    padding: 12px 16px;
  }
 
@@ -545,8 +694,14 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
 
   mark(root, "data-agy-output-mode");
   mark(root, "data-agy-theme-style");
+  mark(root, "data-agy-chat-width");
   mark(root, "data-agy-dream-root");
   mark(root, "data-agy-dream-clear");
+
+  let localChatWidth = null;
+  let pendingChatWidth = null;
+  let configChatWidth = clampInt(config.chatWidth, 0, 0, 100);
+  let lastGeoKey = "";
 
   const nativeBackgrounds = new WeakMap([[root, getComputedStyle(root).backgroundColor]]);
   function surfaceBackground(el) {
@@ -564,10 +719,48 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
     rgb.reduce((a, b) => a + b, 0) < 360;
   variable(document.body, "--agy-dream-base-bg", dark ? "#070709" : "#f4f5f8");
 
+  let active = true;
   let mediaEl = null;
   let currentKind = "";
   let currentSrc = "";
+  let videoRecoverTimer = 0;
+  let videoWatchdog = null;
+  let lastVideoTime = -1;
+  let stalledBeats = 0;
+  let dragCleanup = null;
+
+  function playVideoSafely(v) {
+    if (!v || !active || currentKind !== "video" || config.videoPaused || document.hidden) return;
+    try {
+      const p = v.play();
+      if (p && typeof p.catch === "function") p.catch(() => {});
+    } catch {}
+  }
+
+  function onVisibilityChange() {
+    if (!mediaEl || currentKind !== "video") return;
+    if (document.hidden) {
+      try {
+        mediaEl.pause();
+      } catch {}
+    } else {
+      playVideoSafely(mediaEl);
+    }
+  }
+  if (typeof document.addEventListener === "function") {
+    document.addEventListener("visibilitychange", onVisibilityChange);
+  }
+
   function releaseMedia() {
+    clearTimeout(videoRecoverTimer);
+    videoRecoverTimer = 0;
+    if (videoWatchdog) {
+      clearInterval(videoWatchdog);
+      videoWatchdog = null;
+    }
+    lastVideoTime = -1;
+    stalledBeats = 0;
+    lastGeoKey = "";
     if (!mediaEl) return;
     if (currentKind === "video") {
       try {
@@ -588,8 +781,8 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
         mediaEl.muted = cfg.videoMuted !== false;
         mediaEl.defaultMuted = cfg.videoMuted !== false;
         mediaEl.playbackRate = Math.max(0.25, Math.min(2, cfg.videoPlaybackRate ?? 1));
-        if (cfg.videoPaused) mediaEl.pause();
-        else mediaEl.play().catch(() => {});
+        if (cfg.videoPaused || document.hidden) mediaEl.pause();
+        else playVideoSafely(mediaEl);
       }
       return;
     }
@@ -605,29 +798,73 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
       userSelect: "none",
       zIndex: "0",
       transform: "translateZ(0)",
+      willChange: "transform",
+      backfaceVisibility: "hidden",
+      contain: "layout style paint",
     });
     if (kind === "video") {
-      mediaEl.autoplay = true;
+      mediaEl.autoplay = !document.hidden && !cfg.videoPaused;
       mediaEl.loop = true;
       mediaEl.playsInline = true;
+      mediaEl.preload = "auto";
+      mediaEl.disablePictureInPicture = true;
+      mediaEl.disableRemotePlayback = true;
       mediaEl.muted = cfg.videoMuted !== false;
       mediaEl.defaultMuted = cfg.videoMuted !== false;
       mediaEl.playbackRate = Math.max(0.25, Math.min(2, cfg.videoPlaybackRate ?? 1));
       mediaEl.addEventListener("loadedmetadata", () => geometry());
+      mediaEl.addEventListener("ended", () => {
+        if (!active || cfg.videoPaused || document.hidden) return;
+        try {
+          mediaEl.currentTime = 0;
+        } catch {}
+        playVideoSafely(mediaEl);
+      });
+      const scheduleRecover = () => {
+        clearTimeout(videoRecoverTimer);
+        videoRecoverTimer = setTimeout(() => playVideoSafely(mediaEl), 700);
+      };
+      mediaEl.addEventListener("stalled", scheduleRecover);
+      mediaEl.addEventListener("waiting", scheduleRecover);
+      videoWatchdog = setInterval(() => {
+        if (!active || currentKind !== "video" || !mediaEl || document.hidden || config.videoPaused) return;
+        if (mediaEl.readyState < 2) return;
+        if (mediaEl.paused) {
+          playVideoSafely(mediaEl);
+          return;
+        }
+        const cur = mediaEl.currentTime;
+        if (cur === lastVideoTime) {
+          stalledBeats++;
+          if (stalledBeats >= 2) {
+            stalledBeats = 0;
+            try {
+              const dur = Number.isFinite(mediaEl.duration) && mediaEl.duration > 0.2 ? mediaEl.duration : 0;
+              mediaEl.currentTime = dur ? (cur + 0.03) % dur : cur + 0.03;
+            } catch {}
+            playVideoSafely(mediaEl);
+          }
+        } else {
+          lastVideoTime = cur;
+          stalledBeats = 0;
+        }
+      }, 3000);
+      videoWatchdog?.unref?.();
     } else {
       mediaEl.alt = "";
       mediaEl.addEventListener("load", () => geometry());
     }
     mediaEl.src = src;
     layer.prepend(mediaEl);
-    if (kind === "video" && !cfg.videoPaused) mediaEl.play().catch(() => {});
+    if (kind === "video" && !cfg.videoPaused && !document.hidden) playVideoSafely(mediaEl);
   }
 
-  let active = true;
   let timer;
   let observer;
   let resize;
   let geometryTarget = null;
+  let rafId = 0;
+  let lastScanAt = 0;
 
   function geometry() {
     const pane = [...document.querySelectorAll(".agy-sheet")].sort(
@@ -640,52 +877,154 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
     const rootRect = root.getBoundingClientRect();
     const width = Math.max(innerWidth || 0, rootRect.width || 0);
     const height = Math.max(innerHeight || 0, rootRect.height || 0);
-    Object.assign(layer.style, {
-      inset: "auto",
-      left: "0px",
-      top: "0px",
-      width: width + "px",
-      height: height + "px",
-      borderRadius: "0px",
-    });
+    const natW = mediaEl ? (currentKind === "video" ? mediaEl.videoWidth : mediaEl.naturalWidth) : 0;
+    const natH = mediaEl ? (currentKind === "video" ? mediaEl.videoHeight : mediaEl.naturalHeight) : 0;
+    const geoKey = [width, height, natW, natH, config.fit, config.zoom, config.positionX, config.positionY].join("|");
+    if (geoKey !== lastGeoKey) {
+      lastGeoKey = geoKey;
+      Object.assign(layer.style, {
+        inset: "auto",
+        left: "0px",
+        top: "0px",
+        width: width + "px",
+        height: height + "px",
+        borderRadius: "0px",
+      });
+      if (mediaEl) {
+        if (natW > 0 && natH > 0) {
+          const factor =
+            (config.fit === "contain"
+              ? Math.min(width / natW, height / natH)
+              : Math.max(width / natW, height / natH)) * (config.zoom ?? 1);
+          const w = Math.round(natW * factor);
+          const h = Math.round(natH * factor);
+          Object.assign(mediaEl.style, {
+            width: w + "px",
+            height: h + "px",
+            left: Math.round(((width - w) * (config.positionX ?? 50)) / 100) + "px",
+            top: Math.round(((height - h) * (config.positionY ?? 50)) / 100) + "px",
+            objectFit: "fill",
+          });
+        } else {
+          Object.assign(mediaEl.style, {
+            left: "0px",
+            top: "0px",
+            width: "100%",
+            height: "100%",
+            objectFit: config.fit === "contain" ? "contain" : "cover",
+            objectPosition: (config.positionX ?? 50) + "% " + (config.positionY ?? 50) + "%",
+          });
+        }
+      }
+    }
     if (resize && geometryTarget !== root) {
       if (geometryTarget) resize.unobserve(geometryTarget);
       resize.observe(root);
       geometryTarget = root;
     }
-    if (mediaEl) {
-      const natW = currentKind === "video" ? mediaEl.videoWidth : mediaEl.naturalWidth;
-      const natH = currentKind === "video" ? mediaEl.videoHeight : mediaEl.naturalHeight;
-      if (natW > 0 && natH > 0) {
-        const factor =
-          (config.fit === "contain"
-            ? Math.min(width / natW, height / natH)
-            : Math.max(width / natW, height / natH)) * (config.zoom ?? 1);
-        const w = Math.round(natW * factor);
-        const h = Math.round(natH * factor);
-        Object.assign(mediaEl.style, {
-          width: w + "px",
-          height: h + "px",
-          left: Math.round((width - w) * (config.positionX ?? 50) / 100) + "px",
-          top: Math.round((height - h) * (config.positionY ?? 50) / 100) + "px",
-          objectFit: "fill",
+    return { region: root, scope: pane || root, width, height };
+  }
+
+  function applyCommittedChatWidth(pct) {
+    localChatWidth = pct;
+    pendingChatWidth = pct;
+    configChatWidth = pct;
+    root.setAttribute("data-agy-chat-width", pct >= 45 ? "custom" : "default");
+    document.documentElement.style.removeProperty("--agy-chat-width");
+    document.documentElement.style.removeProperty("--max-conversation-width");
+    tokenStyle.textContent = buildTokenCss(config, dark);
+  }
+
+  function attachResizeHandles() {
+    for (const composer of root.querySelectorAll(".surface-composer")) {
+      if (composer.querySelector(".agy-dream-width-handle")) continue;
+      for (const side of ["left", "right"]) {
+        const handle = document.createElement("div");
+        handle.className = "agy-dream-width-handle";
+        handle.setAttribute("data-side", side);
+        handle.title = "左右拖动调整会话框宽度（双击还原官方默认）";
+        handle.addEventListener("dblclick", (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          applyCommittedChatWidth(0);
         });
-      } else {
-        Object.assign(mediaEl.style, {
-          left: "0px",
-          top: "0px",
-          width: "100%",
-          height: "100%",
-          objectFit: config.fit === "contain" ? "contain" : "cover",
-          objectPosition: (config.positionX ?? 50) + "% " + (config.positionY ?? 50) + "%",
+        handle.addEventListener("pointerdown", (ev) => {
+          if (ev.button !== 0) return;
+          ev.preventDefault();
+          ev.stopPropagation();
+          dragCleanup?.();
+          const isLeft = side === "left";
+          const maxWrap = composer.closest?.('[style*="--max-conversation-width"]') || composer.parentElement;
+          const paneWrap = maxWrap?.parentElement || document.querySelector?.('[data-testid="conversation-view"]');
+          const paneInnerW = Math.max(480, (paneWrap ? paneWrap.clientWidth : innerWidth) - 32);
+          const minW = Math.min(480, paneInnerW);
+          const startW = (maxWrap || composer).getBoundingClientRect().width || Math.min(768, paneInnerW);
+          const startX = ev.clientX;
+          let latestPct = clampInt(Math.round((startW / paneInnerW) * 100), 75, 45, 100);
+          let moveRaf = 0;
+          let moveClientX = ev.clientX;
+          let moveClientY = ev.clientY;
+          handle.setAttribute("data-dragging", "1");
+
+          const badge = document.createElement("div");
+          badge.id = "agy-dream-width-badge";
+          document.body.append(badge);
+
+          const syncDragFrame = () => {
+            moveRaf = 0;
+            const dx = moveClientX - startX;
+            const targetPx = Math.round(Math.max(minW, Math.min(paneInnerW, startW + (isLeft ? -2 : 2) * dx)));
+            latestPct = clampInt(Math.round((targetPx / paneInnerW) * 100), 75, 45, 100);
+            root.setAttribute("data-agy-chat-width", "custom");
+            document.documentElement.style.setProperty("--agy-chat-width", targetPx + "px");
+            document.documentElement.style.setProperty("--max-conversation-width", targetPx + "px", "important");
+            badge.style.left = moveClientX + "px";
+            badge.style.top = Math.max(36, moveClientY) + "px";
+            badge.textContent = `宽度 ${latestPct}% (${targetPx}px)`;
+          };
+
+          const onMove = (mv) => {
+            moveClientX = mv.clientX;
+            moveClientY = mv.clientY;
+            if (!moveRaf && typeof requestAnimationFrame === "function") {
+              moveRaf = requestAnimationFrame(syncDragFrame);
+            }
+          };
+
+          const finishDrag = () => {
+            if (moveRaf && typeof cancelAnimationFrame === "function") cancelAnimationFrame(moveRaf);
+            syncDragFrame();
+            handle.removeAttribute("data-dragging");
+            badge.remove();
+            window.removeEventListener("pointermove", onMove, true);
+            window.removeEventListener("pointerup", finishDrag, true);
+            window.removeEventListener("pointercancel", finishDrag, true);
+            dragCleanup = null;
+            applyCommittedChatWidth(latestPct);
+          };
+
+          dragCleanup = () => {
+            if (moveRaf && typeof cancelAnimationFrame === "function") cancelAnimationFrame(moveRaf);
+            handle.removeAttribute("data-dragging");
+            badge.remove();
+            window.removeEventListener("pointermove", onMove, true);
+            window.removeEventListener("pointerup", finishDrag, true);
+            window.removeEventListener("pointercancel", finishDrag, true);
+          };
+
+          window.addEventListener("pointermove", onMove, true);
+          window.addEventListener("pointerup", finishDrag, true);
+          window.addEventListener("pointercancel", finishDrag, true);
+          syncDragFrame();
         });
+        composer.append(handle);
       }
     }
-    return { region: root, scope: pane || root, width, height };
   }
 
   function scan() {
     if (!active) return;
+    lastScanAt = Date.now();
     for (let i = saved.length - 1; i >= 0; i--) {
       if (!saved[i][0].isConnected) {
         restore(saved[i]);
@@ -694,11 +1033,12 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
       }
     }
     const area = geometry();
-    for (const fade of area.scope.querySelectorAll(".absolute.bottom-0.pointer-events-none")) {
+    attachResizeHandles();
+    for (const fade of root.querySelectorAll(".absolute.bottom-0.pointer-events-none, [class*='pointer-events-none'][style*='linear-gradient']")) {
       const rect = fade.getBoundingClientRect();
       if (
-        rect.height <= 80 &&
-        rect.width > area.width * 0.3 &&
+        rect.height <= 96 &&
+        rect.width > 100 &&
         getComputedStyle(fade).backgroundImage.includes("linear-gradient")
       ) {
         mark(fade, "data-agy-dream-fade");
@@ -729,7 +1069,7 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
         el === layer ||
         el === style ||
         el === tokenStyle ||
-        el.closest("#agy-dream-wallpaper-v2,[data-mention-menu],.typeahead-popover,.agy-overlay,[role=listbox],[role=menu],[role=dialog],[data-testid=sidecar-iframe-slot],[data-testid=sidecar-iframe]")
+        el.closest("#agy-dream-wallpaper-v2,[data-mention-menu],.typeahead-popover,.agy-overlay,[role=listbox],[role=menu],[role=dialog],[role=scrollbar],[data-overlay-scrollbar-track],[data-overlay-scrollbar-thumb],[data-testid*='scrollbar'],[data-split-sash],[data-testid=sidecar-iframe-slot],[data-testid=sidecar-iframe],.agy-dream-width-handle")
       ) {
         continue;
       }
@@ -751,7 +1091,7 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
         bg !== "transparent" &&
         !el.querySelector?.("[data-testid=sidecar-iframe]") &&
         (el.matches("aside,nav,header,[role=navigation]") ||
-          (rect.width < innerWidth * 0.35 && rect.height > innerHeight * 0.55) ||
+          (rect.width >= 140 && rect.width < innerWidth * 0.35 && rect.height > innerHeight * 0.55) ||
           (rect.top < 90 && rect.width > innerWidth * 0.65 && rect.height < 110))
       ) {
         mark(el, "data-agy-dream-chrome");
@@ -767,14 +1107,34 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
 
   function schedule() {
     clearTimeout(timer);
-    timer = setTimeout(scan, 240);
+    const delay = Date.now() - lastScanAt < 180 ? 180 : 32;
+    timer = setTimeout(() => {
+      if (typeof requestAnimationFrame === "function") {
+        if (!rafId) {
+          rafId = requestAnimationFrame(() => {
+            rafId = 0;
+            scan();
+          });
+        }
+      } else {
+        scan();
+      }
+    }, delay);
   }
 
   function update(next) {
+    const incomingChat = clampInt(next.chatWidth, 0, 0, 100);
+    if (incomingChat !== configChatWidth) {
+      localChatWidth = null;
+      configChatWidth = incomingChat;
+    }
     config = next;
+    lastGeoKey = "";
     const isStarNeko = config.glass?.themeStyle !== "official";
+    const effChat = localChatWidth !== null ? localChatWidth : configChatWidth;
     root.setAttribute("data-agy-output-mode", config.outputMode === "glass" ? "glass" : "transparent");
     root.setAttribute("data-agy-theme-style", isStarNeko ? "star-neko" : "official");
+    root.setAttribute("data-agy-chat-width", effChat >= 45 ? "custom" : "default");
     document.body.style.setProperty("--agy-dream-base-bg", isStarNeko ? (dark ? "#211e2d" : "#f3edfc") : dark ? "#070709" : "#f4f5f8");
     layer.style.opacity = String(config.opacity ?? 0.55);
     layer.style.backgroundColor =
@@ -803,8 +1163,21 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
   function destroy() {
     active = false;
     clearTimeout(timer);
+    if (rafId && typeof cancelAnimationFrame === "function") {
+      cancelAnimationFrame(rafId);
+      rafId = 0;
+    }
+    dragCleanup?.();
+    dragCleanup = null;
+    if (typeof document.removeEventListener === "function") {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    }
     observer?.disconnect();
     resize?.disconnect();
+    for (const h of root.querySelectorAll(".agy-dream-width-handle")) h.remove();
+    document.getElementById?.("agy-dream-width-badge")?.remove();
+    document.documentElement.style.removeProperty("--agy-chat-width");
+    document.documentElement.style.removeProperty("--max-conversation-width");
     releaseMedia();
     layer.remove();
     style.remove();
@@ -831,6 +1204,7 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
     protected: root.querySelectorAll("[data-agy-dream-protect]").length,
     surfaces: root.querySelectorAll("[data-agy-dream-clear]").length,
     trackedChanges: saved.length,
+    chatWidth: localChatWidth !== null ? localChatWidth : configChatWidth,
   });
   const entry = {
     update,
@@ -839,6 +1213,11 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
     touch: () => {
       entry.lastSeen = Date.now();
       return true;
+    },
+    consumeChatWidth: () => {
+      const w = pendingChatWidth;
+      pendingChatWidth = null;
+      return w;
     },
     lastSeen: Date.now(),
     rev: THEME_REV,

@@ -22,6 +22,8 @@ const SAVEABLE_KEYS = [
   "videoMuted",
   "videoPlaybackRate",
   "videoPaused",
+  "videoSmoothMode",
+  "chatWidth",
   "widgetAutoLaunch",
   "widgetHideTray",
   "glass",

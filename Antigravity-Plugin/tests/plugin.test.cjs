@@ -265,3 +265,56 @@ test("widget supervisor defaults to --no-tray and service manages ~/.antigravity
   assert.equal(savedWidget.scale, 180);
   assert.equal(savedWidget.bubbleOn, false);
 });
+
+test("media picker uses UTF-8 UTF-16LE encoded PowerShell args and web preview avoids duplicate 4K decoding", async (t) => {
+  const { buildWin32PickerArgs } = await import("../sidecars/star-suite/media-picker.mjs");
+  const args = buildWin32PickerArgs();
+  const encIdx = args.indexOf("-EncodedCommand");
+  assert.ok(encIdx >= 0 && args[encIdx + 1]);
+  const script = Buffer.from(args[encIdx + 1], "base64").toString("utf16le");
+  assert.match(script, /OutputEncoding\s*=\s*\[System\.Text\.UTF8Encoding\]::new\(\$false\)/);
+  assert.match(script, /TopMost\s*=\s*\$true/);
+  assert.match(script, /ShowDialog\(\$owner\)/);
+
+  const html = fs.readFileSync(path.join(pluginRoot, "sidecars/star-suite/web/index.html"), "utf8");
+  const css = fs.readFileSync(path.join(pluginRoot, "sidecars/star-suite/web/styles.css"), "utf8");
+  const app = fs.readFileSync(path.join(pluginRoot, "sidecars/star-suite/web/app.js"), "utf8");
+  assert.match(html, /id=["']chkVideoSmoothMode["']/);
+  assert.match(html, /id=["']rngChatWidth["']/);
+  assert.match(html, /data-chat-width=["']94["']/);
+  const previewTagMatch = html.match(/<video[^>]+id=["']previewVideo["'][^>]*>/);
+  assert.ok(previewTagMatch);
+  assert.doesNotMatch(previewTagMatch[0], /\bautoplay\b/i);
+  assert.doesNotMatch(previewTagMatch[0], /\bloop\b/i);
+  assert.match(css, /::-webkit-scrollbar\s*\{[\s\S]*width:\s*4px;/);
+  assert.doesNotMatch(app, /el\.previewVideo\.play\(/);
+  assert.match(app, /el\.previewVideo\.pause\(\)/);
+
+  const { createStarSuiteService, startStandaloneHttpServer } = await import(
+    "../sidecars/star-suite/main.mjs"
+  );
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "star-suite-width-"));
+  const service = await createStarSuiteService({
+    settingsFile: path.join(tmpDir, "settings.json"),
+    discover: async () => null,
+    widgetSupervisor: { status: () => ({ available: false, running: false }) },
+    autoTick: false,
+    autoStartWidget: false,
+  });
+  await service.start();
+  const httpSrv = await startStandaloneHttpServer(service, { port: 0 });
+  t.after(async () => {
+    await httpSrv.close();
+    await service.stop();
+  });
+
+  const res = await fetch(`${httpSrv.url}/api/settings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chatWidth: 86, videoSmoothMode: false }),
+  });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.settings.chatWidth, 86);
+  assert.equal(body.settings.videoSmoothMode, false);
+});

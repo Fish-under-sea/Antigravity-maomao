@@ -5,6 +5,7 @@ class HostController {
     this.owner = options.owner || require("node:crypto").randomUUID();
     this.loader = loader;
     this.onStatus = onStatus;
+    this.onHostPatch = typeof options.onHostPatch === "function" ? options.onHostPatch : null;
     this.discover = options.discover || discover;
     this.createClient = options.createClient || (url => new Cdp(url));
     this.client = null;
@@ -46,7 +47,7 @@ class HostController {
         this.signature = null;
       }
       const current = await this.client.evaluate(
-        "({ready:document.readyState,themed:!!window.__agyDreamSkinV2?.status().applied,owner:window.__agyDreamSkinV2?.owner,rev:window.__agyDreamSkinV2?.rev||0,stale:typeof window.__agyDreamSkinV2?.lastSeen==='number'&&(Date.now()-window.__agyDreamSkinV2.lastSeen>15000)})"
+        "({ready:document.readyState,themed:!!window.__agyDreamSkinV2?.status().applied,owner:window.__agyDreamSkinV2?.owner,rev:window.__agyDreamSkinV2?.rev||0,stale:typeof window.__agyDreamSkinV2?.lastSeen==='number'&&(Date.now()-window.__agyDreamSkinV2.lastSeen>15000),chatWidth:window.__agyDreamSkinV2?.consumeChatWidth?.()??null})"
       );
       if (revision !== this.revision || this.stopping) return;
       if (!settings.enabled) {
@@ -70,9 +71,25 @@ class HostController {
         await this.client.evaluate("window.__agyDreamSkinV2?.destroy()");
         this.signature = null;
       }
-      const signature = JSON.stringify(settings);
-      if (!current.themed || current.stale || current.rev !== 9 || signature !== this.signature) {
-        const payload = { ...this.loader.payload(settings), owner: this.owner };
+      let effectiveSettings = settings;
+      if (
+        current.themed &&
+        current.owner === this.owner &&
+        typeof current.chatWidth === "number" &&
+        current.chatWidth !== effectiveSettings.chatWidth
+      ) {
+        effectiveSettings = { ...effectiveSettings, chatWidth: current.chatWidth };
+        this.settings = { ...this.settings, chatWidth: current.chatWidth };
+        this.signature = JSON.stringify(effectiveSettings);
+        if (this.onHostPatch) {
+          try {
+            await this.onHostPatch({ chatWidth: current.chatWidth });
+          } catch {}
+        }
+      }
+      const signature = JSON.stringify(effectiveSettings);
+      if (!current.themed || current.stale || current.rev !== 10 || signature !== this.signature) {
+        const payload = { ...this.loader.payload(effectiveSettings), owner: this.owner };
         const result = await this.client.evaluate("(" + installTheme.toString() + ")(" + JSON.stringify(payload) + ")");
         this.signature = signature;
         this.report({

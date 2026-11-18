@@ -25,6 +25,8 @@ const ALLOWED_SETTINGS_KEYS = new Set([
   "videoMuted",
   "videoPlaybackRate",
   "videoPaused",
+  "videoSmoothMode",
+  "chatWidth",
   "widgetAutoLaunch",
   "widgetHideTray",
   "glass",
@@ -122,6 +124,15 @@ export async function createStarSuiteService(options = {}) {
       owner: options.owner || "antigravity-star-suite-plugin",
       discover: options.discover,
       createClient: options.createClient,
+      onHostPatch: (patch) => {
+        const clean = filterAllowed(patch, ALLOWED_SETTINGS_KEYS);
+        if (Object.keys(clean).length > 0) {
+          settings.update(clean);
+          if (typeof options.onStatus === "function") {
+            options.onStatus(snapshot());
+          }
+        }
+      },
     }
   );
 

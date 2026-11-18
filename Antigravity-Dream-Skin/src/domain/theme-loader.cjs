@@ -110,6 +110,11 @@ class DreamSkinThemeLoader {
       videoMuted: settings.videoMuted !== false,
       videoPlaybackRate: Math.max(0.25, Math.min(2, settings.videoPlaybackRate ?? 1)),
       videoPaused: Boolean(settings.videoPaused),
+      videoSmoothMode: settings.videoSmoothMode !== false,
+      chatWidth: (() => {
+        const w = Math.round(Number(settings.chatWidth) || 0);
+        return w > 0 ? Math.max(45, Math.min(100, w)) : 0;
+      })(),
       glass: settings.glass || DEFAULT_GLASS,
       font: settings.font || DEFAULT_FONT,
     };

@@ -33,7 +33,7 @@ function fixture(){
     const payload=JSON.parse(expression.slice(expression.lastIndexOf(")({")+2,-1));
     applied.push(payload);
     if(blockApply){const gate=blockApply;blockApply=null;await gate;}
-    state={themed:true,owner:payload.owner,rev:9};
+    state={themed:true,owner:payload.owner,rev:10};
     return {applied:true};
    }
    if(expression.includes("touch?.()")){
@@ -446,4 +446,167 @@ test('stale orphaned skin from crashed sidecar is reclaimed while live other own
  assert.equal(f.applied.length,1);
  assert.equal(f.controller.status.applied,true);
  await f.controller.stop();
+});
+
+test('LocalMediaServer supports cache ETag 304 and HEAD for smooth 4K loopback streaming',async t=>{
+ const {LocalMediaServer}=require('../src/domain/media-server.cjs');
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'dream-cache-'));
+ const mp4=path.join(dir,'冬_循环_4K60.mp4');
+ fs.writeFileSync(mp4,Buffer.from('ABCDEFGHIJKLMNOP'));
+ const srv=new LocalMediaServer();
+ await srv.start();
+ t.after(()=>srv.stop());
+ const url=srv.register(mp4);
+ const first=await fetch(url);
+ assert.equal(first.status,200);
+ assert.match(first.headers.get('cache-control')||'',/private,\s*max-age=/);
+ const etag=first.headers.get('etag');
+ assert.ok(etag);
+ const notModified=await fetch(url,{headers:{'If-None-Match':etag}});
+ assert.equal(notModified.status,304);
+ const headRes=await fetch(url,{method:'HEAD'});
+ assert.equal(headRes.status,200);
+ assert.equal(await headRes.text(),'');
+});
+
+test('DreamSkinSettings sanitizes videoSmoothMode and chatWidth, and HostController consumes dragged chatWidth via onHostPatch',async()=>{
+ const file=path.join(fs.mkdtempSync(path.join(os.tmpdir(),'dream-chatw-')),'settings.json');
+ const s=new DreamSkinSettings(file);
+ assert.equal(s.get('videoSmoothMode'),true);
+ assert.equal(s.get('chatWidth'),0);
+ s.update({videoSmoothMode:false,chatWidth:12});
+ assert.equal(s.get('videoSmoothMode'),false);
+ assert.equal(s.get('chatWidth'),45);
+ s.update({chatWidth:180});
+ assert.equal(s.get('chatWidth'),100);
+ s.update({chatWidth:0});
+ assert.equal(s.get('chatWidth'),0);
+
+ const loaderPayload=new DreamSkinThemeLoader().payload({...s.getAll(),chatWidth:88});
+ assert.equal(loaderPayload.chatWidth,88);
+ assert.equal(loaderPayload.videoSmoothMode,false);
+
+ let patched=null;
+ let applyCount=0;
+ let state={ready:'complete',themed:true,owner:'drag-owner',rev:10,stale:false,chatWidth:91};
+ const client={
+  closed:false,
+  async evaluate(expression){
+   if(expression.startsWith('({ready:'))return {...state};
+   if(expression.startsWith('(async function installTheme')){applyCount++;return {applied:true};}
+   if(expression.includes('touch?.()'))return true;
+   if(expression.includes('destroy()'))return null;
+   throw new Error('Unexpected: '+expression);
+  },
+  close(){this.closed=true;}
+ };
+ const hc=new HostController(
+  {payload:cfg=>({...cfg,image:'data:image/png;base64,AA=='})},
+  ()=>{},
+  {
+   owner:'drag-owner',
+   discover:async()=>({target:{webSocketDebuggerUrl:'ws://127.0.0.1:1/test'}}),
+   createClient:()=>client,
+   onHostPatch:patch=>{patched=patch;}
+  }
+ );
+ hc.settings={enabled:true,chatWidth:0};
+ hc.signature=JSON.stringify(hc.settings);
+ await hc.tick();
+ assert.deepEqual(patched,{chatWidth:91});
+ assert.equal(applyCount,0);
+ assert.equal(hc.settings.chatWidth,91);
+ await hc.stop();
+});
+
+test('installTheme REV 10 eliminates black fades, slims scrollbars, optimizes 4K video blur, and applies custom chatWidth without chrome scrollbar bugs',async()=>{
+ const {installTheme}=require('../src/host/theme.cjs');
+ function makeEl(tag,extra={}){
+  const attrs=new Map(),children=[];
+  const el={
+   tagName:tag.toUpperCase(),
+   id:'',
+   children,
+   isConnected:true,
+   parentElement:null,
+   style:{_props:{},setProperty(k,v){this._props[k]=v;},getPropertyValue(k){return this._props[k]||'';},getPropertyPriority(){return '';},removeProperty(k){delete this._props[k];}},
+   setAttribute(k,v){if(k==='id')el.id=v;attrs.set(k,String(v));},
+   getAttribute(k){return attrs.get(k)??null;},
+   hasAttribute(k){return attrs.has(k);},
+   removeAttribute(k){attrs.delete(k);},
+   addEventListener(){},
+   removeEventListener(){},
+   append(...nodes){for(const n of nodes){n.parentElement=el;children.push(n);}},
+   prepend(...nodes){for(const n of nodes){n.parentElement=el;children.unshift(n);}},
+   remove(){el.isConnected=false;if(el.parentElement){const i=el.parentElement.children.indexOf(el);if(i>=0)el.parentElement.children.splice(i,1);}},
+   matches(){return false;},
+   closest(sel){return extra.closestMatch&&sel.includes(extra.closestMatch)?el:null;},
+   contains(target){return target===el||children.some(c=>c.contains?.(target));},
+   querySelector(){return null;},
+   querySelectorAll(sel){return extra.queryAll&&!String(sel).includes('.surface-composer')?extra.queryAll:[];},
+   getBoundingClientRect(){return extra.rect||{left:0,top:0,width:1280,height:720,right:1280,bottom:720};},
+   play(){return Promise.resolve();},
+   pause(){},
+   load(){},
+   classList:{add(){},remove(){},contains(){return false;}}
+  };
+  return el;
+ }
+ const narrowScrollbar=makeEl('div',{closestMatch:'overlay-scrollbar-thumb',rect:{left:1270,top:10,width:6,height:500,right:1276,bottom:510}});
+ const rootEl=makeEl('div',{queryAll:[narrowScrollbar]});rootEl.id='root';
+ const bodyEl=makeEl('body');bodyEl.append(rootEl);
+ const headEl=makeEl('head');
+ const docEl=makeEl('html');
+ const origGlobals={window:global.window,document:global.document,getComputedStyle:global.getComputedStyle,MutationObserver:global.MutationObserver,ResizeObserver:global.ResizeObserver,innerWidth:global.innerWidth,innerHeight:global.innerHeight};
+ try{
+  global.window={};
+  global.document={documentElement:docEl,head:headEl,body:bodyEl,hidden:false,addEventListener(){},removeEventListener(){},createElement:tag=>makeEl(tag),querySelector:sel=>sel==='#root'?rootEl:null,querySelectorAll:()=>[]};
+  global.getComputedStyle=()=>({backgroundColor:'rgb(20, 20, 28)',backgroundImage:'none'});
+  global.MutationObserver=class{observe(){}disconnect(){}};
+  global.ResizeObserver=class{observe(){}unobserve(){}disconnect(){}};
+  global.innerWidth=1280;
+  global.innerHeight=720;
+
+  await installTheme({
+   owner:'rev10-owner',
+   outputMode:'transparent',
+   mediaKind:'video',
+   mediaUrl:'http://127.0.0.1:45555/media?token=abc&path=clip.mp4',
+   videoSmoothMode:true,
+   chatWidth:88,
+   glass:{themeStyle:'star-neko',tint:'#ffffff',veil:0,radius:16,regions:{sidebar:{fill:78,blur:18},content:{fill:60,blur:22},overlay:{fill:68,blur:24},control:{fill:72,blur:14},header:{fill:84,blur:14},bar:{fill:80,blur:14}}},
+   font:{accent:'',darkSeparate:false,colors:{},colorsDark:{}}
+  });
+  const baseCss=headEl.children.find(c=>c.id==='agy-dream-style-v2')?.textContent||'';
+  const tokenCss=headEl.children.find(c=>c.id==='agy-dream-tokens-v2')?.textContent||'';
+  assert.equal(global.window.__agyDreamSkinV2.rev,10);
+  assert.equal(narrowScrollbar.hasAttribute('data-agy-dream-chrome'),false);
+  assert.equal(rootEl.getAttribute('data-agy-chat-width'),'custom');
+  assert.match(baseCss,/\[data-testid="overlay-scrollbar-thumb"\][\s\S]*width:\s*3px\s*!important/);
+  assert.match(baseCss,/::-webkit-scrollbar\s*\{[\s\S]*width:\s*4px\s*!important/);
+  assert.match(baseCss,/\.md-sticky-message-bleed::before/);
+  assert.match(baseCss,/\.agy-dream-width-handle/);
+  assert.match(tokenCss,/--agy-chat-width:\s*clamp\(480px,\s*88%/);
+  assert.match(tokenCss,/--max-conversation-width:\s*var\(--agy-chat-width\)\s*!important/);
+  assert.match(tokenCss,/--lg-filter-content:\s*blur\(10px\);/);
+  assert.doesNotMatch(tokenCss,/saturate\(165%\)/);
+
+  global.window.__agyDreamSkinV2.update({
+   owner:'rev10-owner',
+   outputMode:'transparent',
+   mediaKind:'video',
+   mediaUrl:'http://127.0.0.1:45555/media?token=abc&path=clip.mp4',
+   videoSmoothMode:false,
+   chatWidth:0,
+   glass:{themeStyle:'star-neko',tint:'#ffffff',veil:0,radius:16,regions:{sidebar:{fill:78,blur:18},content:{fill:60,blur:22},overlay:{fill:68,blur:24},control:{fill:72,blur:14},header:{fill:84,blur:14},bar:{fill:80,blur:14}}},
+   font:{accent:'',darkSeparate:false,colors:{},colorsDark:{}}
+  });
+  const tokenFull=headEl.children.find(c=>c.id==='agy-dream-tokens-v2')?.textContent||'';
+  assert.equal(rootEl.getAttribute('data-agy-chat-width'),'default');
+  assert.match(tokenFull,/--lg-filter-content:\s*blur\(22px\)\s*saturate\(165%\);/);
+  assert.doesNotMatch(tokenFull,/--max-conversation-width:/);
+  global.window.__agyDreamSkinV2.destroy();
+ }finally{
+  Object.assign(global,origGlobals);
+ }
 });

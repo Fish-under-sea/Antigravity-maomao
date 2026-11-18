@@ -69,6 +69,7 @@
     recentList: $("recentList"),
     videoControls: $("videoControls"),
     chkVideoMuted: $("chkVideoMuted"),
+    chkVideoSmoothMode: $("chkVideoSmoothMode"),
     btnVideoPause: $("btnVideoPause"),
     selPlaybackRate: $("selPlaybackRate"),
     previewStage: $("previewStage"),
@@ -77,6 +78,9 @@
     previewScrim: $("previewScrim"),
     outputModeBtns: Array.from(document.querySelectorAll("[data-output-mode]")),
     fitBtns: Array.from(document.querySelectorAll("[data-fit]")),
+    chatWidthBtns: Array.from(document.querySelectorAll("[data-chat-width]")),
+    rngChatWidth: $("rngChatWidth"),
+    valChatWidth: $("valChatWidth"),
     rngOpacity: $("rngOpacity"),
     valOpacity: $("valOpacity"),
     rngZoom: $("rngZoom"),
@@ -365,18 +369,38 @@
     if (isVideo) {
       el.previewImg.classList.add("hidden");
       el.previewVideo.classList.remove("hidden");
+      // Keep preview frozen at a poster frame so we never decode two 4K streams simultaneously
+      el.previewVideo.autoplay = false;
+      el.previewVideo.loop = false;
+      el.previewVideo.muted = true;
       if (loadedVideoSrc !== media.mediaUrl) {
         loadedVideoSrc = media.mediaUrl;
+        const pausePreview = () => {
+          if (loadedVideoSrc !== media.mediaUrl) return;
+          el.previewVideo.pause();
+        };
+        el.previewVideo.onloadeddata = () => {
+          const dur = el.previewVideo.duration;
+          if (Number.isFinite(dur) && dur > 0.25 && el.previewVideo.currentTime < 0.05) {
+            el.previewVideo.onseeked = () => {
+              el.previewVideo.onseeked = null;
+              pausePreview();
+            };
+            try {
+              el.previewVideo.currentTime = 0.1;
+              return;
+            } catch {}
+          }
+          pausePreview();
+        };
         el.previewVideo.src = media.mediaUrl;
+      } else {
+        el.previewVideo.pause();
       }
-      el.previewVideo.muted = s.videoMuted !== false;
-      el.previewVideo.playbackRate = Number(s.videoPlaybackRate || 1);
       el.previewVideo.style.objectFit = fitMode;
       el.previewVideo.style.objectPosition = objectPos;
       el.previewVideo.style.opacity = String(opacity);
       el.previewVideo.style.transform = transform;
-      if (s.videoPaused) el.previewVideo.pause();
-      else el.previewVideo.play().catch(() => {});
     } else {
       el.previewVideo.classList.add("hidden");
       if (loadedVideoSrc) {
@@ -739,14 +763,24 @@
     const showVideo = s.mediaType === "video" || media.mediaKind === "video";
     el.videoControls.classList.toggle("hidden", !showVideo);
     el.chkVideoMuted.checked = s.videoMuted !== false;
+    el.chkVideoSmoothMode.checked = s.videoSmoothMode !== false;
     el.btnVideoPause.textContent = s.videoPaused ? "继续" : "暂停";
     el.selPlaybackRate.value = String(s.videoPlaybackRate ?? 1);
 
-    el.rngOpacity.value = String(s.opacity);
+    const chatWidth = Math.round(Number(s.chatWidth || 0));
+    for (const btn of el.chatWidthBtns) {
+      const target = Number(btn.dataset.chatWidth);
+      btn.classList.toggle("active", chatWidth < 45 ? target === 0 : chatWidth === target);
+    }
+    if (!isInteracting) {
+      el.rngChatWidth.value = String(chatWidth >= 45 ? chatWidth : 60);
+      el.rngOpacity.value = String(s.opacity);
+      el.rngScrim.value = String(s.scrim);
+      el.rngZoom.value = String(s.zoom);
+    }
+    el.valChatWidth.textContent = chatWidth >= 45 ? chatWidth + "%" : "官方";
     el.valOpacity.textContent = Math.round(s.opacity) + "%";
-    el.rngScrim.value = String(s.scrim);
     el.valScrim.textContent = Math.round(s.scrim) + "%";
-    el.rngZoom.value = String(s.zoom);
     el.valZoom.textContent = Number(s.zoom).toFixed(2) + "x";
 
     renderRecentChips(state);
@@ -834,9 +868,23 @@
   });
 
   el.chkVideoMuted.addEventListener("change", () => saveSettings({ videoMuted: el.chkVideoMuted.checked }));
+  el.chkVideoSmoothMode.addEventListener("change", () => saveSettings({ videoSmoothMode: el.chkVideoSmoothMode.checked }));
   el.btnVideoPause.addEventListener("click", () => saveSettings({ videoPaused: !latestState?.settings?.videoPaused }));
   el.selPlaybackRate.addEventListener("change", () => saveSettings({ videoPlaybackRate: Number(el.selPlaybackRate.value) }));
   el.btnResetCamera.addEventListener("click", () => saveSettings({ positionX: 50, positionY: 50, zoom: 1 }));
+
+  for (const btn of el.chatWidthBtns) {
+    btn.addEventListener("click", () => saveSettings({ chatWidth: Number(btn.dataset.chatWidth) }));
+  }
+  el.rngChatWidth.addEventListener("pointerdown", () => { isInteracting = true; });
+  el.rngChatWidth.addEventListener("input", () => {
+    const v = Math.round(Number(el.rngChatWidth.value));
+    el.valChatWidth.textContent = v + "%";
+  });
+  el.rngChatWidth.addEventListener("change", () => {
+    isInteracting = false;
+    saveSettings({ chatWidth: Math.round(Number(el.rngChatWidth.value)) });
+  });
 
   for (const [input, key, fmt, output] of [
     [el.rngOpacity, "opacity", (v) => `${Math.round(v)}%`, el.valOpacity],
@@ -994,7 +1042,10 @@
   el.previewStage.addEventListener("pointercancel", endDrag);
 
   fetchState();
-  setInterval(() => {
+  window.addEventListener("focus", () => {
     if (!dragging && !isInteracting) fetchState();
+  });
+  setInterval(() => {
+    if (!document.hidden && !dragging && !isInteracting) fetchState();
   }, 4000);
 })();

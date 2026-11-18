@@ -44,6 +44,8 @@ const DEFAULT_SETTINGS = {
   videoMuted: true,
   videoPlaybackRate: 1,
   videoPaused: false,
+  videoSmoothMode: true,
+  chatWidth: 0,
   widgetAutoLaunch: true,
   widgetHideTray: true,
   glass: DEFAULT_GLASS,
@@ -183,6 +185,11 @@ class DreamSkinSettings {
       videoMuted: bool(raw.videoMuted, true),
       videoPlaybackRate: finite(raw.videoPlaybackRate, 1, 0.25, 2),
       videoPaused: bool(raw.videoPaused, false),
+      videoSmoothMode: bool(raw.videoSmoothMode, true),
+      chatWidth: (() => {
+        const w = Math.round(finite(raw.chatWidth, 0, 0, 100));
+        return w === 0 ? 0 : Math.max(45, w);
+      })(),
       widgetAutoLaunch: bool(raw.widgetAutoLaunch, true),
       widgetHideTray: bool(raw.widgetHideTray, true),
       glass: sanitizeGlass(raw.glass, DEFAULT_GLASS),
