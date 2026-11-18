@@ -106,3 +106,192 @@ test('wallpaper positioning and zoom survive restart and clamp invalid ranges',(
  s.update({positionX:-1,positionY:999,zoom:99});assert.equal(s.get('positionX'),0);assert.equal(s.get('positionY'),100);assert.equal(s.get('zoom'),2);
  const payload=new DreamSkinThemeLoader().payload(restored.getAll());assert.equal(payload.positionX,12);assert.equal(payload.positionY,73);assert.equal(payload.zoom,1.4);
 });
+
+test('custom mp4 and image media settings persist, clamp rate, and deduplicate recentMedia',()=>{
+ const file=path.join(fs.mkdtempSync(path.join(os.tmpdir(),'dream-media-set-')),'settings.json'),s=new DreamSkinSettings(file);
+ assert.equal(s.get('mediaType'),'preset');
+ s.update({
+  mediaType:'video',
+  customMediaPath:'C:\\wallpapers\\loop.mp4',
+  recentMedia:['C:\\wallpapers\\a.png','C:\\wallpapers\\loop.mp4','C:\\wallpapers\\a.png'],
+  videoMuted:false,
+  videoPlaybackRate:3.5,
+  videoPaused:true
+ });
+ const reloaded=new DreamSkinSettings(file);
+ assert.equal(reloaded.get('mediaType'),'video');
+ assert.equal(reloaded.get('customMediaPath'),'C:\\wallpapers\\loop.mp4');
+ assert.deepEqual(reloaded.get('recentMedia'),['C:\\wallpapers\\a.png','C:\\wallpapers\\loop.mp4']);
+ assert.equal(reloaded.get('videoMuted'),false);
+ assert.equal(reloaded.get('videoPlaybackRate'),2);
+ assert.equal(reloaded.get('videoPaused'),true);
+ reloaded.update({mediaType:'invalid-kind',videoPlaybackRate:0.01});
+ assert.equal(reloaded.get('mediaType'),'preset');
+ assert.equal(reloaded.get('videoPlaybackRate'),0.25);
+});
+
+test('LocalMediaServer streams byte ranges with token auth and blocks unapproved paths',async t=>{
+ const http=require('node:http');
+ const {LocalMediaServer,detectMediaKind}=require('../src/domain/media-server.cjs');
+ assert.equal(detectMediaKind('clip.MP4'),'video');
+ assert.equal(detectMediaKind('art.webp'),'image');
+ assert.equal(detectMediaKind('evil.exe'),null);
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'dream-srv-'));
+ const mp4=path.join(dir,'sample.mp4'),secret=path.join(dir,'secret.txt');
+ fs.writeFileSync(mp4,Buffer.from('0123456789ABCDEF'));
+ fs.writeFileSync(secret,'topsecret');
+ const srv=new LocalMediaServer();
+ await srv.start();
+ t.after(()=>srv.stop());
+ const url=srv.register(mp4);
+ const unauth=await fetch(url.replace(/token=[^&]+/,'token=wrong'));
+ assert.equal(unauth.status,401);
+ const blocked=await fetch(`${srv.baseUrl}/media?token=${srv.token}&path=${encodeURIComponent(secret)}`);
+ assert.equal(blocked.status,403);
+ const partial=await fetch(url,{headers:{Range:'bytes=2-7'}});
+ assert.equal(partial.status,206);
+ assert.equal(partial.headers.get('content-type'),'video/mp4');
+ assert.equal(partial.headers.get('content-range'),'bytes 2-7/16');
+ assert.equal(await partial.text(),'234567');
+});
+
+test('DreamSkinThemeLoader resolves custom video and image via LocalMediaServer',async t=>{
+ const {LocalMediaServer}=require('../src/domain/media-server.cjs');
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'dream-ldr-'));
+ const mp4=path.join(dir,'bg.mp4'),jpg=path.join(dir,'bg.jpg');
+ fs.writeFileSync(mp4,Buffer.from('fake-mp4-bytes'));
+ fs.writeFileSync(jpg,Buffer.from('fake-jpg-bytes'));
+ const srv=new LocalMediaServer();
+ await srv.start();
+ t.after(()=>srv.stop());
+ const loader=new DreamSkinThemeLoader({mediaServer:srv});
+ const vPayload=loader.payload({mediaType:'video',customMediaPath:mp4,videoMuted:true,videoPlaybackRate:1.25,scrim:10,opacity:60,fit:'cover',positionX:50,positionY:50,zoom:1});
+ assert.equal(vPayload.mediaKind,'video');
+ assert(vPayload.mediaUrl.startsWith(srv.baseUrl));
+ assert.equal(vPayload.videoPlaybackRate,1.25);
+ const iPayload=loader.payload({mediaType:'image',customMediaPath:jpg,scrim:0,fit:'contain'});
+ assert.equal(iPayload.mediaKind,'image');
+ assert(iPayload.mediaUrl.startsWith(srv.baseUrl));
+ assert.throws(()=>loader.payload({mediaType:'video',customMediaPath:path.join(dir,'missing.mp4')}),/无法读取|不存在/);
+});
+
+test('installTheme mounts looping video element, preserves element across style updates, and cleans up on destroy',async()=>{
+ const {installTheme}=require('../src/host/theme.cjs');
+ function makeEl(tag){
+  const attrs=new Map(),listeners=new Map(),children=[];
+  const el={
+   tagName:tag.toUpperCase(),
+   id:'',
+   children,
+   isConnected:true,
+   parentElement:null,
+   style:{
+    _props:{},
+    setProperty(k,v){this._props[k]=v;},
+    getPropertyValue(k){return this._props[k]||'';},
+    getPropertyPriority(){return '';},
+    removeProperty(k){delete this._props[k];}
+   },
+   playCalls:0,
+   pauseCalls:0,
+   loadCalls:0,
+   videoWidth:1920,
+   videoHeight:1080,
+   naturalWidth:1672,
+   naturalHeight:941,
+   setAttribute(k,v){if(k==='id')el.id=v;attrs.set(k,String(v));},
+   getAttribute(k){return attrs.get(k)??null;},
+   hasAttribute(k){return attrs.has(k);},
+   removeAttribute(k){attrs.delete(k);if(k==='src')el.src='';},
+   addEventListener(evt,fn){listeners.set(evt,fn);},
+   append(...nodes){for(const n of nodes){n.parentElement=el;children.push(n);}},
+   prepend(...nodes){for(const n of nodes){n.parentElement=el;children.unshift(n);}},
+   remove(){el.isConnected=false;if(el.parentElement){const i=el.parentElement.children.indexOf(el);if(i>=0)el.parentElement.children.splice(i,1);}},
+   matches(){return false;},
+   closest(){return null;},
+   contains(target){return target===el||children.some(c=>c.contains?.(target));},
+   querySelector(sel){if(sel==='#root')return rootEl;return null;},
+   querySelectorAll(){return [];},
+   getBoundingClientRect(){return {left:0,top:0,width:1280,height:720,right:1280,bottom:720};},
+   play(){el.playCalls++;return Promise.resolve();},
+   pause(){el.pauseCalls++;},
+   load(){el.loadCalls++;},
+   classList:{add(){},remove(){}}
+  };
+  return el;
+ }
+ const rootEl=makeEl('div');rootEl.id='root';
+ const bodyEl=makeEl('body');bodyEl.append(rootEl);
+ const headEl=makeEl('head');
+ const docEl=makeEl('html');
+ const origGlobals={window:global.window,document:global.document,getComputedStyle:global.getComputedStyle,MutationObserver:global.MutationObserver,ResizeObserver:global.ResizeObserver,innerWidth:global.innerWidth,innerHeight:global.innerHeight};
+ try{
+  global.window={};
+  global.document={
+   documentElement:docEl,
+   head:headEl,
+   body:bodyEl,
+   createElement:tag=>makeEl(tag),
+   querySelector:sel=>sel==='#root'?rootEl:null,
+   querySelectorAll:()=>[]
+  };
+  global.getComputedStyle=()=>({backgroundColor:'rgb(24, 24, 34)',backgroundImage:'none'});
+  global.MutationObserver=class{observe(){}disconnect(){}};
+  global.ResizeObserver=class{observe(){}unobserve(){}disconnect(){}};
+  global.innerWidth=1280;
+  global.innerHeight=720;
+
+  const videoUrl='http://127.0.0.1:45555/media?token=abc&path=demo.mp4';
+  const status=await installTheme({
+   owner:'test-owner',
+   outputMode:'transparent',
+   mediaKind:'video',
+   mediaUrl:videoUrl,
+   videoMuted:true,
+   videoPlaybackRate:1.25,
+   videoPaused:false,
+   opacity:0.65,
+   scrim:0.15,
+   fit:'cover',
+   positionX:50,
+   positionY:50,
+   zoom:1
+  });
+  assert.equal(status.applied,true);
+  assert.equal(status.mediaKind,'video');
+  const layer=bodyEl.children.find(c=>c.id==='agy-dream-wallpaper-v2');
+  const videoEl=layer.children.find(c=>c.id==='agy-dream-media-v2');
+  assert.equal(videoEl.tagName,'VIDEO');
+  assert.equal(videoEl.src,videoUrl);
+  assert.equal(videoEl.loop,true);
+  assert.equal(videoEl.muted,true);
+  assert.equal(videoEl.playbackRate,1.25);
+
+  await installTheme({
+   owner:'test-owner',
+   outputMode:'glass',
+   mediaKind:'video',
+   mediaUrl:videoUrl,
+   videoMuted:true,
+   videoPlaybackRate:1.5,
+   videoPaused:true,
+   opacity:0.8,
+   scrim:0.2,
+   fit:'contain',
+   positionX:40,
+   positionY:60,
+   zoom:1.1
+  });
+  const sameVideoEl=layer.children.find(c=>c.id==='agy-dream-media-v2');
+  assert.equal(sameVideoEl,videoEl);
+  assert.equal(sameVideoEl.playbackRate,1.5);
+  assert.ok(sameVideoEl.pauseCalls>=1);
+
+  global.window.__agyDreamSkinV2.destroy();
+  assert.equal(global.window.__agyDreamSkinV2,undefined);
+  assert.equal(videoEl.isConnected,false);
+  assert.ok(videoEl.loadCalls>=1);
+ }finally{
+  Object.assign(global,origGlobals);
+ }
+});
