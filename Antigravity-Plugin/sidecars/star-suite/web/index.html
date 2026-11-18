@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>星语桌宠 &amp; 织梦皮肤</title>
+  <script src="./preload.js"></script>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-badge" aria-hidden="true">✦</div>
+        <div>
+          <h1>星语 · Dream Skin</h1>
+          <p class="subtitle">Antigravity 原生插件托管 · 升级不掉补丁</p>
+        </div>
+      </div>
+      <button type="button" class="btn btn-ghost btn-sm" id="btnRefresh" title="立即重新检测 Antigravity 宿主">
+        刷新状态
+      </button>
+    </header>
+
+    <div class="banner banner-error hidden" id="errorBanner" role="alert"></div>
+
+    <!-- Card 1: Widget Supervisor -->
+    <section class="card" aria-labelledby="widgetHeading">
+      <div class="card-head">
+        <div>
+          <h2 id="widgetHeading">星语桌宠挂件</h2>
+          <p class="card-desc" id="widgetPathDesc">自动随插件启动并托管猫娘桌宠</p>
+        </div>
+        <span class="pill" id="widgetStatusPill">检测中</span>
+      </div>
+
+      <div class="row row-between">
+        <label class="switch-label" for="chkWidgetAutoLaunch">
+          <input type="checkbox" id="chkWidgetAutoLaunch">
+          <span>随 Antigravity 启动自动唤起桌宠</span>
+        </label>
+      </div>
+
+      <div class="btn-group">
+        <button type="button" class="btn btn-primary" id="btnWidgetRecall">唤起桌宠</button>
+        <button type="button" class="btn btn-secondary" id="btnWidgetStart">后台启动</button>
+        <button type="button" class="btn btn-danger-subtle" id="btnWidgetQuit">退出桌宠</button>
+      </div>
+    </section>
+
+    <!-- Card 2: Dream Skin -->
+    <section class="card" aria-labelledby="skinHeading">
+      <div class="card-head">
+        <div>
+          <h2 id="skinHeading">织梦动态壁纸皮肤</h2>
+          <p class="card-desc" id="hostStatusText">正在连接 Antigravity 宿主...</p>
+        </div>
+        <span class="pill" id="hostStatusPill">未连接</span>
+      </div>
+
+      <div class="control-row">
+        <label class="toggle-pill">
+          <input type="checkbox" id="chkSkinEnabled">
+          <span>启用背景皮肤</span>
+        </label>
+
+        <div class="segmented" role="group" aria-label="显示模式">
+          <button type="button" class="seg-btn" data-output-mode="transparent">透明直显</button>
+          <button type="button" class="seg-btn" data-output-mode="glass">毛玻璃</button>
+        </div>
+      </div>
+
+      <!-- Media source picker -->
+      <div class="subsection">
+        <div class="sub-head">
+          <span class="sub-title">背景素材（支持 MP4 / WEBM / 图片）</span>
+          <span class="tag" id="activeMediaBadge">内置预设</span>
+        </div>
+
+        <div class="media-name" id="activeMediaName">Gemini 角色立绘预设</div>
+
+        <div class="btn-group">
+          <button type="button" class="btn btn-primary" id="btnPickMedia">选择本地 MP4 / 图片</button>
+          <button type="button" class="btn btn-secondary" id="btnSelectPreset">恢复内置预设</button>
+        </div>
+
+        <form class="path-form" id="pathForm">
+          <input
+            type="text"
+            id="inputMediaPath"
+            class="input"
+            placeholder="或直接粘贴本地 .mp4 / .webm / .png / .jpg 路径..."
+            spellcheck="false"
+            autocomplete="off"
+          >
+          <button type="submit" class="btn btn-ghost">应用</button>
+        </form>
+
+        <div class="recent-wrap hidden" id="recentWrap">
+          <div class="recent-label">最近使用</div>
+          <div class="recent-list" id="recentList"></div>
+        </div>
+      </div>
+
+      <!-- Video playback options -->
+      <div class="subsection hidden" id="videoControls">
+        <div class="sub-head">
+          <span class="sub-title">视频播放设置</span>
+        </div>
+        <div class="control-row">
+          <label class="switch-label" for="chkVideoMuted">
+            <input type="checkbox" id="chkVideoMuted">
+            <span>静音循环</span>
+          </label>
+          <button type="button" class="btn btn-secondary btn-sm" id="btnVideoPause">暂停</button>
+          <label class="rate-wrap" for="selPlaybackRate">
+            <span>倍速</span>
+            <select id="selPlaybackRate" class="select">
+              <option value="0.5">0.5x</option>
+              <option value="0.75">0.75x</option>
+              <option value="1">1.0x</option>
+              <option value="1.25">1.25x</option>
+              <option value="1.5">1.5x</option>
+              <option value="2">2.0x</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <!-- Interactive Stage Preview -->
+      <div class="stage-box">
+        <div class="stage" id="previewStage" title="拖动画面可调整显示焦点的位置">
+          <img id="previewImg" class="stage-media hidden" alt="壁纸预览" draggable="false">
+          <video id="previewVideo" class="stage-media hidden" autoplay loop muted playsinline></video>
+          <div class="stage-scrim" id="previewScrim"></div>
+          <div class="stage-hint">拖动调整背景焦点</div>
+        </div>
+      </div>
+
+      <!-- Layout & Visual sliders -->
+      <div class="subsection">
+        <div class="control-row">
+          <div class="segmented" role="group" aria-label="填充模式">
+            <button type="button" class="seg-btn" data-fit="adaptive">自适应</button>
+            <button type="button" class="seg-btn" data-fit="cover">铺满裁剪</button>
+            <button type="button" class="seg-btn" data-fit="contain">完整显示</button>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" id="btnResetCamera">居中复位</button>
+        </div>
+
+        <div class="sliders">
+          <label class="slider-row">
+            <span>背景透明度</span>
+            <input type="range" id="rngOpacity" min="0" max="100" step="1">
+            <output id="valOpacity">55%</output>
+          </label>
+          <label class="slider-row">
+            <span>暗角遮罩</span>
+            <input type="range" id="rngScrim" min="0" max="60" step="1">
+            <output id="valScrim">12%</output>
+          </label>
+          <label class="slider-row">
+            <span>局部放大</span>
+            <input type="range" id="rngZoom" min="1" max="2" step="0.05">
+            <output id="valZoom">1.00x</output>
+          </label>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
