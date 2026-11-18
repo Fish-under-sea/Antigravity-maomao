@@ -26,17 +26,45 @@ const ALLOWED_SETTINGS_KEYS = new Set([
   "videoPlaybackRate",
   "videoPaused",
   "widgetAutoLaunch",
+  "widgetHideTray",
+  "glass",
+  "font",
 ]);
 
-function filterAllowedSettings(partial) {
+const ALLOWED_WIDGET_KEYS = new Set([
+  "scale",
+  "alwaysOnTop",
+  "reducedMotion",
+  "sound",
+  "volume",
+  "soundSet",
+  "bubbleOn",
+  "turnCostOn",
+  "turnCostDurationMs",
+  "clickThrough",
+  "snap",
+  "hostWindowOnly",
+  "hostDock",
+  "hostOffsetX",
+  "hostOffsetY",
+  "easterEggs",
+  "bubblePage",
+  "manualQuota",
+  "manualPercent",
+  "manualWeeklyPercent",
+]);
+
+function filterAllowed(partial, allowSet) {
   if (!partial || typeof partial !== "object") return {};
-  return Object.fromEntries(
-    Object.entries(partial).filter(([key]) => ALLOWED_SETTINGS_KEYS.has(key))
-  );
+  return Object.fromEntries(Object.entries(partial).filter(([key]) => allowSet.has(key)));
 }
 
 function defaultSettingsPath() {
   return process.env.DREAM_SKIN_SETTINGS_FILE || path.join(os.homedir(), ".antigravity-dream-skin/settings.json");
+}
+
+function defaultWidgetSettingsPath() {
+  return process.env.CAT_WIDGET_SETTINGS_FILE || path.join(os.homedir(), ".antigravity-cat-widget/settings.json");
 }
 
 function readWebAsset(filename) {
@@ -54,9 +82,15 @@ export async function createStarSuiteService(options = {}) {
     HostController,
     LocalMediaServer,
     detectMediaKind,
+    WidgetSettingsManager,
+    DEFAULT_WIDGET_SETTINGS,
+    ALLOWED_SOUND_SETS,
   } = loadDreamSkinModules(__dirname);
 
   const settings = new DreamSkinSettings(options.settingsFile || defaultSettingsPath());
+  const widgetSettings = WidgetSettingsManager
+    ? new WidgetSettingsManager(options.widgetSettingsFile || defaultWidgetSettingsPath())
+    : null;
   const mediaServer = new LocalMediaServer();
   await mediaServer.start();
 
@@ -74,6 +108,7 @@ export async function createStarSuiteService(options = {}) {
     new WidgetSupervisor({
       repoRoot: root,
       getConfiguredPath: () => process.env.ANTIGRAVITY_STAR_WIDGET_PATH || "",
+      getHideTray: () => settings.get("widgetHideTray") !== false,
     });
 
   const controller = new HostController(
@@ -84,6 +119,7 @@ export async function createStarSuiteService(options = {}) {
       }
     },
     {
+      owner: options.owner || "antigravity-star-suite-plugin",
       discover: options.discover,
       createClient: options.createClient,
     }
@@ -138,15 +174,29 @@ export async function createStarSuiteService(options = {}) {
       recentItems: buildRecentItems(s),
       mediaServerUrl: mediaServer.baseUrl,
       widget,
+      widgetSettings: widgetSettings ? widgetSettings.getAll() : DEFAULT_WIDGET_SETTINGS || {},
+      widgetDefaults: { ...(DEFAULT_WIDGET_SETTINGS || {}), soundSets: ALLOWED_SOUND_SETS },
       staged,
     };
   };
 
   const updateSettings = async (partial) => {
-    const allowed = filterAllowedSettings(partial);
+    const allowed = filterAllowed(partial, ALLOWED_SETTINGS_KEYS);
     settings.update(allowed);
     syncAllowedMedia();
     await controller.update(settings.getAll());
+    return snapshot();
+  };
+
+  const updateWidgetSettings = async (partial, { extraFlag = "" } = {}) => {
+    const allowed = filterAllowed(partial, ALLOWED_WIDGET_KEYS);
+    if (widgetSettings && Object.keys(allowed).length > 0) {
+      widgetSettings.update(allowed);
+    }
+    await widgetSupervisor.reloadSettings?.({
+      hideTray: settings.get("widgetHideTray") !== false,
+      extraFlag,
+    });
     return snapshot();
   };
 
@@ -198,16 +248,40 @@ export async function createStarSuiteService(options = {}) {
 
   const handleWidgetAction = async (action, value) => {
     widgetActionError = "";
+    const hideTray = settings.get("widgetHideTray") !== false;
     let result;
     if (action === "start") {
-      result = widgetSupervisor.ensureStarted({ silent: false });
+      result = await widgetSupervisor.ensureStarted({ silent: false, hideTray });
     } else if (action === "recall") {
-      result = widgetSupervisor.recall();
+      result = await widgetSupervisor.recall({ hideTray });
+    } else if (action === "restart") {
+      result = await (widgetSupervisor.restart
+        ? widgetSupervisor.restart({ silent: true, hideTray })
+        : widgetSupervisor.ensureStarted({ silent: true, hideTray }));
     } else if (action === "quit") {
       result = widgetSupervisor.quit();
+    } else if (action === "dock-left") {
+      if (widgetSettings) widgetSettings.update({ hostDock: "left", hostOffsetY: 0 });
+      result = await widgetSupervisor.reloadSettings?.({ hideTray, extraFlag: "--dock-left" });
+    } else if (action === "dock-right") {
+      if (widgetSettings) widgetSettings.update({ hostDock: "right", hostOffsetX: 0, hostOffsetY: 0 });
+      result = await widgetSupervisor.reloadSettings?.({ hideTray, extraFlag: "--dock-right" });
+    } else if (action === "reset-pos") {
+      if (widgetSettings) widgetSettings.update({ hostDock: "", hostOffsetX: 18, hostOffsetY: 18 });
+      result = await widgetSupervisor.reloadSettings?.({ hideTray, extraFlag: "--reset-pos" });
     } else if (action === "autoLaunch") {
       settings.update({ widgetAutoLaunch: Boolean(value) });
       result = { ok: true, widgetAutoLaunch: settings.get("widgetAutoLaunch") };
+    } else if (action === "hideTray") {
+      const nextHide = Boolean(value);
+      settings.update({ widgetHideTray: nextHide });
+      if (widgetSupervisor.status().running) {
+        result = await (widgetSupervisor.restart
+          ? widgetSupervisor.restart({ silent: true, hideTray: nextHide })
+          : { ok: true });
+      } else {
+        result = { ok: true, widgetHideTray: nextHide };
+      }
     } else {
       throw new Error(`未知桌宠操作：${action}`);
     }
@@ -227,7 +301,10 @@ export async function createStarSuiteService(options = {}) {
     syncAllowedMedia();
     await controller.update(settings.getAll());
     if (options.autoStartWidget !== false && settings.get("widgetAutoLaunch")) {
-      widgetSupervisor.ensureStarted({ silent: true });
+      await widgetSupervisor.ensureStarted({
+        silent: true,
+        hideTray: settings.get("widgetHideTray") !== false,
+      });
     }
     if (options.autoTick !== false) {
       const intervalMs = Number.isFinite(options.pollIntervalMs) ? options.pollIntervalMs : 4000;
@@ -259,6 +336,7 @@ export async function createStarSuiteService(options = {}) {
     widgetSupervisor,
     snapshot,
     updateSettings,
+    updateWidgetSettings,
     applySelectedMediaPath,
     selectPreset,
     pickAndApplyMedia,
@@ -350,6 +428,14 @@ function buildRouteHandlers(service) {
         handle: async (body) => ({
           status: 200,
           data: await service.handleWidgetAction(body?.action, body?.value),
+        }),
+      },
+      {
+        method: "POST",
+        path: "/api/widget-settings",
+        handle: async (body) => ({
+          status: 200,
+          data: await service.updateWidgetSettings(body),
         }),
       },
     ],

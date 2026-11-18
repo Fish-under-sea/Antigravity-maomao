@@ -30,6 +30,8 @@ const SKIN_RUNTIME_FILES = [
   "assets/wallpapers/gemini-character-sheet-v1/wallpaper.png",
 ];
 
+const WIDGET_RUNTIME_FILES = ["src/domain/settings.cjs"];
+
 function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
 }
@@ -71,6 +73,7 @@ export function installStarSuitePlugin(options = {}) {
 
   const pluginSrcDir = path.join(repoRoot, "Antigravity-Plugin");
   const skinSrcDir = path.join(repoRoot, "Antigravity-Dream-Skin");
+  const widgetSrcDir = path.join(repoRoot, "Antigravity-Cat-Widget");
   const sharedSrcDir = path.join(repoRoot, "shared");
   const stagedRuntimeRoot = path.join(targetDir, "sidecars", "star-suite", "runtime");
 
@@ -94,6 +97,13 @@ export function installStarSuitePlugin(options = {}) {
     plannedCopies.push({
       src: path.join(skinSrcDir, rel),
       dst: path.join(stagedRuntimeRoot, "Antigravity-Dream-Skin", rel),
+    });
+  }
+
+  for (const rel of WIDGET_RUNTIME_FILES) {
+    plannedCopies.push({
+      src: path.join(widgetSrcDir, rel),
+      dst: path.join(stagedRuntimeRoot, "Antigravity-Cat-Widget", rel),
     });
   }
 

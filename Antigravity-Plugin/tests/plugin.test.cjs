@@ -193,3 +193,75 @@ test("installStarSuitePlugin stages self-contained runtime and enables plugin in
   assert.equal(cfg.plugins.swarm.enabled, true);
   assert.equal(cfg.plugins["antigravity-star-suite"].enabled, true);
 });
+
+test("plugin UI avoids ES module scripts inside plugin:// iframe and includes themeStyle + concentric radius controls", () => {
+  const html = fs.readFileSync(path.join(pluginRoot, "sidecars/star-suite/web/index.html"), "utf8");
+  const css = fs.readFileSync(path.join(pluginRoot, "sidecars/star-suite/web/styles.css"), "utf8");
+  const app = fs.readFileSync(path.join(pluginRoot, "sidecars/star-suite/web/app.js"), "utf8");
+  assert.doesNotMatch(html, /type\s*=\s*["']module["']/i);
+  assert.match(html, /<script[^>]+defer[^>]+src=["']\.\/app\.js(?:\?[^"']*)?["']/i);
+  assert.match(html, /data-theme-style=["']star-neko["']/);
+  assert.match(html, /data-theme-style=["']official["']/);
+  assert.match(html, /id=["']rngGlassRadius["']/);
+  assert.doesNotMatch(css, /color\s*:\s*var\(--muted\)/i);
+  assert.match(css, /--ss-radius-inner/);
+  assert.match(css, /html,\s*body\s*\{[\s\S]*background:\s*transparent\s*!important/);
+  assert.match(app, /ssStandalone/);
+  assert.match(app, /themeStyleBtns/);
+  assert.match(app, /rngGlassRadius/);
+});
+
+test("widget supervisor defaults to --no-tray and service manages ~/.antigravity-cat-widget settings", async (t) => {
+  const { buildWidgetLaunchArgs } = await import("../sidecars/star-suite/widget-supervisor.mjs");
+  assert.deepEqual(buildWidgetLaunchArgs({ silent: true, hideTray: true }), ["--background", "--no-tray"]);
+  assert.deepEqual(buildWidgetLaunchArgs({ silent: false, hideTray: true }), ["--no-tray"]);
+  assert.deepEqual(buildWidgetLaunchArgs({ silent: true, hideTray: false }), ["--background", "--tray"]);
+
+  const { createStarSuiteService, startStandaloneHttpServer } = await import(
+    "../sidecars/star-suite/main.mjs"
+  );
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "star-widget-cfg-"));
+  const settingsFile = path.join(tmpDir, "skin-settings.json");
+  const widgetSettingsFile = path.join(tmpDir, "widget-settings.json");
+  let reloadCount = 0;
+  const fakeWidget = {
+    ensureStarted: () => ({ ok: true }),
+    recall: () => ({ ok: true }),
+    restart: () => ({ ok: true }),
+    reloadSettings: () => {
+      reloadCount += 1;
+      return { ok: true };
+    },
+    quit: () => ({ ok: true }),
+    status: () => ({ available: true, running: true, managedByPlugin: true, error: "" }),
+  };
+
+  const service = await createStarSuiteService({
+    settingsFile,
+    widgetSettingsFile,
+    discover: async () => null,
+    widgetSupervisor: fakeWidget,
+    autoTick: false,
+    autoStartWidget: false,
+  });
+  await service.start();
+  const httpSrv = await startStandaloneHttpServer(service, { port: 0 });
+  t.after(async () => {
+    await httpSrv.close();
+    await service.stop();
+  });
+
+  const wsRes = await fetch(`${httpSrv.url}/api/widget-settings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scale: 180, bubbleOn: false, hostWindowOnly: true, sound: true }),
+  });
+  assert.equal(wsRes.status, 200);
+  const wsBody = await wsRes.json();
+  assert.equal(wsBody.widgetSettings.scale, 180);
+  assert.equal(wsBody.widgetSettings.bubbleOn, false);
+  assert.equal(reloadCount, 1);
+  const savedWidget = JSON.parse(fs.readFileSync(widgetSettingsFile, "utf8"));
+  assert.equal(savedWidget.scale, 180);
+  assert.equal(savedWidget.bubbleOn, false);
+});

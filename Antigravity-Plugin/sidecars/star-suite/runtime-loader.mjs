@@ -22,7 +22,8 @@ export function resolveSuiteRoot(baseDir = __dirname) {
 export function loadDreamSkinModules(baseDir = __dirname) {
   const { root, staged } = resolveSuiteRoot(baseDir);
   const skinRoot = path.join(root, "Antigravity-Dream-Skin");
-  const { DreamSkinSettings, DEFAULT_SETTINGS } = require(
+  const widgetSettingsModPath = path.join(root, "Antigravity-Cat-Widget/src/domain/settings.cjs");
+  const { DreamSkinSettings, DEFAULT_SETTINGS, DEFAULT_GLASS, DEFAULT_FONT } = require(
     path.join(skinRoot, "src/domain/settings.cjs")
   );
   const { DreamSkinThemeLoader } = require(
@@ -37,17 +38,32 @@ export function loadDreamSkinModules(baseDir = __dirname) {
     mimeTypeForPath,
   } = require(path.join(skinRoot, "src/domain/media-server.cjs"));
 
+  let WidgetSettingsManager = null;
+  let DEFAULT_WIDGET_SETTINGS = null;
+  let ALLOWED_SOUND_SETS = ["original", "wood-tap", "bubble-pop", "soft-spring"];
+  if (fs.existsSync(widgetSettingsModPath)) {
+    const wMod = require(widgetSettingsModPath);
+    WidgetSettingsManager = wMod.SettingsManager;
+    DEFAULT_WIDGET_SETTINGS = wMod.DEFAULT_SETTINGS;
+    ALLOWED_SOUND_SETS = wMod.ALLOWED_SOUND_SETS || ALLOWED_SOUND_SETS;
+  }
+
   return {
     root,
     skinRoot,
     staged,
     DreamSkinSettings,
     DEFAULT_SETTINGS,
+    DEFAULT_GLASS,
+    DEFAULT_FONT,
     DreamSkinThemeLoader,
     HostController,
     LocalMediaServer,
     detectMediaKind,
     mimeTypeForPath,
+    WidgetSettingsManager,
+    DEFAULT_WIDGET_SETTINGS,
+    ALLOWED_SOUND_SETS,
   };
 }
 
