@@ -33,7 +33,7 @@ function fixture(){
     const payload=JSON.parse(expression.slice(expression.lastIndexOf(")({")+2,-1));
     applied.push(payload);
     if(blockApply){const gate=blockApply;blockApply=null;await gate;}
-    state={themed:true,owner:payload.owner,rev:7};
+    state={themed:true,owner:payload.owner,rev:9};
     return {applied:true};
    }
    if(expression.includes("touch?.()")){
@@ -410,6 +410,9 @@ test('installTheme takes over official Antigravity glass/font vars and styles sl
   assert.match(baseCss,/\.surface-composer[\s\S]*\[data-lexical-editor="true"\][\s\S]*background-color:\s*transparent\s*!important/);
   assert.match(baseCss,/\.bg-sidebar[\s\S]*backdrop-filter:\s*none\s*!important/);
   assert.match(baseCss,/\[data-selected="true"\]/);
+  assert.match(baseCss,/pre\[data-agy-dream-protect\]:has\(> \[class\*="rounded-"\]\)[\s\S]*background-color:\s*transparent\s*!important/);
+  assert.match(baseCss,/\[data-split-fill-edge="left"\]:has\(> \.agy-sheet\)[\s\S]*overflow:\s*hidden\s*!important/);
+  assert.match(baseCss,/\[data-main-content-body="true"\]::before/);
   assert.match(tokenCss,/--lg-filter-sidebar:\s*none/);
   assert.match(tokenCss,/--agy-glass-radius:\s*20px/);
   assert.match(tokenCss,/--agy-radius-outer:/);

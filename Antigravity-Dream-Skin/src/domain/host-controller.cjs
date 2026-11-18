@@ -71,7 +71,7 @@ class HostController {
         this.signature = null;
       }
       const signature = JSON.stringify(settings);
-      if (!current.themed || current.stale || current.rev !== 7 || signature !== this.signature) {
+      if (!current.themed || current.stale || current.rev !== 9 || signature !== this.signature) {
         const payload = { ...this.loader.payload(settings), owner: this.owner };
         const result = await this.client.evaluate("(" + installTheme.toString() + ")(" + JSON.stringify(payload) + ")");
         this.signature = signature;

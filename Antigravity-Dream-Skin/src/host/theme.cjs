@@ -1,7 +1,7 @@
 // Serialized into the host by its existing local CDP endpoint. No app files are modified.
 async function installTheme(config) {
   const key = "__agyDreamSkinV2";
-  const THEME_REV = 7;
+  const THEME_REV = 9;
   if (window[key]) {
     if (window[key].owner && window[key].owner !== config.owner) {
       const dead = typeof window[key].lastSeen === "number" && Date.now() - window[key].lastSeen > 15000;
@@ -211,6 +211,7 @@ async function installTheme(config) {
   --glass-highlight: var(--lg-rim-inset-top) !important;
   --glass-shadow: var(--lg-shadow-pop) !important;
   --sidebar: color-mix(in srgb, var(--lg-surface) var(--agy-glass-sidebar-fill), transparent) !important;
+  --shell-canvas: var(--sidebar) !important;
   --sidebar-secondary: var(--lg-sel-top) !important;
   --sidebar-accent: var(--lg-sel-top) !important;
   --sidebar-border: var(--lg-rim-line) !important;
@@ -274,13 +275,49 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
  html.agy-dream-active-v2 [data-agy-dream-root] { position: relative; z-index: 1; }
  html.agy-dream-active-v2 [data-agy-dream-clear] { background-color: transparent !important; background-image: none !important; }
  html.agy-dream-active-v2 [data-agy-dream-protect] { background-color: var(--agy-dream-old-bg) !important; backdrop-filter: none !important; }
+ /* 代码块（powershell 等 <pre>）：收敛圆角并消除外层 0px 直角与内层圆角卡片叠加 */
+ html.agy-dream-active-v2 pre[data-agy-dream-protect]:has(> [class*="rounded-"]) {
+   background-color: transparent !important;
+   border-radius: var(--agy-radius-inner, 11px) !important;
+ }
+ html.agy-dream-active-v2 pre[data-agy-dream-protect] > [class*="rounded-"] {
+   background-color: var(--agy-dream-old-bg, rgba(14, 15, 22, 0.88)) !important;
+   border-radius: var(--agy-radius-inner, 11px) !important;
+   overflow: hidden !important;
+ }
+ html.agy-dream-active-v2 pre[data-agy-dream-protect]:not(:has(> [class*="rounded-"])) {
+   border-radius: var(--agy-radius-inner, 11px) !important;
+   overflow-x: auto !important;
+   overflow-y: hidden !important;
+ }
+ html.agy-dream-active-v2 :not(pre) > code[data-agy-dream-protect] {
+   border-radius: var(--agy-radius-badge, 6px) !important;
+ }
  html.agy-dream-active-v2 [data-agy-dream-fade] { background: none !important; box-shadow: none !important; }
  html.agy-dream-active-v2 [data-agy-dream-welcome] { padding-top: 0 !important; justify-content: flex-end !important; padding-bottom: 28px !important; }
  html.agy-dream-active-v2 .agy-inset-shell { background-color: transparent !important; }
+ /* 左侧/顶部面板利用外扩同色凹角阴影无缝填补 .agy-sheet 四角圆角空缺，消除 1px 缝隙与内层重影线 */
+ html.agy-dream-active-v2 [data-testid="sidebar-split"] > [data-split-sash="true"] {
+   background-color: var(--sidebar) !important;
+ }
+ html.agy-dream-active-v2 [data-split-root="true"] > [data-split-fill-edge="left"]:has(> .agy-sheet) {
+   overflow: hidden !important;
+ }
  html.agy-dream-active-v2 .agy-sheet {
    border-radius: var(--agy-radius-outer, 20px) !important;
    overflow: hidden !important;
-   box-shadow: inset 0 0 0 1px var(--lg-rim-line) !important;
+   box-shadow:
+     0 0 0 36px var(--sidebar),
+     inset 0 0 0 1px var(--lg-rim-line) !important;
+ }
+ html.agy-dream-active-v2 [data-main-content-body="true"] {
+   border-radius: var(--agy-radius-card, 16px) !important;
+ }
+ html.agy-dream-active-v2 [data-main-content-body="true"]::before,
+ html.agy-dream-active-v2 [data-main-content-body="true"]::after,
+ html.agy-dream-active-v2 [data-testid="aux-pane-split"] .flex-grow.overflow-hidden:has([data-testid="sidecar-iframe"])::after {
+   display: none !important;
+   box-shadow: none !important;
  }
 
  /* 侧边栏区域：仅最外层挂载一层烟熏液态玻璃，彻底消除嵌套 .bg-sidebar 二次叠层与滚动模糊掉帧 */
@@ -319,10 +356,21 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
    box-shadow: inset 3px 0 #bda2f2, inset 0 0 0 1px #bda2f238 !important;
  }
 
- /* 顶栏与右侧 AUX 插件面板：深邃玻璃融合原生窗口控制按钮，统一外层四隅同心圆角 */
- html.agy-dream-active-v2 :is([data-testid="title-menu-bar"], header, [role=tablist], .titlebar) {
-   background-color: color-mix(in srgb, var(--lg-surface) var(--agy-glass-header-fill, 84%), rgba(8, 9, 14, 0.52)) !important;
-   background-image: linear-gradient(90deg, transparent 62%, rgba(0, 0, 0, 0.46) 100%) !important;
+ /* 顶栏与侧边栏保持同一视觉基底色，仅最右侧渐隐过渡至原生窗口控制按钮 */
+ html.agy-dream-active-v2 [data-testid="title-menu-bar"] {
+   background-color: var(--sidebar) !important;
+   background-image: linear-gradient(90deg, transparent max(80%, calc(100% - 170px)), rgba(0, 0, 0, 0.56) 100%) !important;
+   -webkit-backdrop-filter: var(--lg-filter-sidebar, blur(18px) saturate(165%)) !important;
+   backdrop-filter: var(--lg-filter-sidebar, blur(18px) saturate(165%)) !important;
+   border-color: var(--lg-rim-line) !important;
+ }
+ html.agy-dream-active-v2 [data-agy-theme-style="star-neko"] [data-testid="title-menu-bar"] {
+   background-image:
+     radial-gradient(ellipse at 0 0, #a88ee51a, transparent 42%),
+     linear-gradient(90deg, transparent max(80%, calc(100% - 170px)), rgba(0, 0, 0, 0.56) 100%) !important;
+ }
+ html.agy-dream-active-v2 :is(header, [role=tablist], .titlebar):not([data-testid="title-menu-bar"]) {
+   background-color: color-mix(in srgb, var(--lg-surface) var(--agy-glass-header-fill, 84%), transparent) !important;
    -webkit-backdrop-filter: var(--lg-filter-header, blur(14px) saturate(165%)) !important;
    backdrop-filter: var(--lg-filter-header, blur(14px) saturate(165%)) !important;
    border-color: var(--lg-rim-line) !important;
