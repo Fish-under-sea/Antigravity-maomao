@@ -1,6 +1,6 @@
-# 星语 · Antigravity Star Suite 原生插件（v0.3.0 / 适用 Antigravity 2.x）
+# 猫猫壁纸 · Antigravity-maomao 原生插件（v0.3.0 / 适用 Antigravity 2.x）
 
-**结论先行**：将星语猫娘桌宠与织梦壁纸皮肤打包为 Antigravity 原生插件（Sidecar + 侧栏控制面板），无需修改 Antigravity `app.asar` 或桌面快捷方式，自动更新不掉配置，同时支持选择本地 `.mp4` / `.webm` 视频与图片作为工作台背景。
+**结论先行**：将猫猫动态壁纸（4K 60fps 本地 MP4 / 自定义图片 + 液态磨砂玻璃 UI + 会话全高边缘拖拽拉宽 + Windows 原生三键色彩同步）与星语猫娘桌宠打包为 Antigravity 原生插件（Sidecar + 侧栏控制面板），无需修改 Antigravity `app.asar` 或桌面快捷方式，自动更新不掉配置。
 
 ## 核心特性
 
@@ -29,7 +29,11 @@ npm run install:plugin
 1. 将插件清单、Sidecar 与运行时精简文件复制至 `~/.gemini/config/plugins/antigravity-star-suite/`。
 2. 在 `~/.gemini/config/config.json` 的 `plugins` 字段中注册并启用 `antigravity-star-suite`。
 
-完成后重启 Antigravity，即可在插件面板（`AUX_PANE`）中打开 **「星语 & 织梦皮肤」** 进行可视化配置。
+完成后重启 Antigravity，即可在插件面板（`AUX_PANE`）中打开 **「猫猫壁纸」** 进行可视化配置。
+
+## 致谢
+
+- 感谢上游项目 [Monokumakuki/Antigravity-Star-Suite](https://github.com/Monokumakuki/Antigravity-Star-Suite) 提供的星语桌宠与初代织梦皮肤基础。
 
 ### 独立浏览器预览模式
 

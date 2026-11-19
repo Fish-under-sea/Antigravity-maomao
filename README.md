@@ -1,8 +1,26 @@
-# 星语 · Antigravity Star Suite
+# 猫猫壁纸 · Antigravity-maomao
 
-给 Antigravity 添一点蓝紫色星光：一个 Gemini 猫娘桌宠，以及一套可随时撤回的桌面皮肤。
+给 Antigravity 注入一整套丝滑液态玻璃皮肤、4K 60fps 本地 MP4 动态壁纸与 Gemini 猫娘桌宠托管（原生插件架构，零 `app.asar` 补丁、升级不掉配置）。
 
-**两个插件独立启动、独立设置。Windows x64 本地项目，非 Google 官方产品。**
+**支持原生 Antigravity 2.x 插件模式与独立桌面运行。Windows x64 本地项目，非 Google 官方产品。**
+
+## 快速安装（猫猫壁纸原生插件 · 推荐）
+
+### 方式一：Release 资产包一键安装（无需 git clone）
+
+1. 前往本仓库 [Releases 页面](https://github.com/Fish-under-sea/Antigravity-maomao/releases) 下载最新发布的 **`antigravity-maomao-plugin.zip`**。
+2. 解压后双击运行 **`一键安装猫猫壁纸插件.bat`**（或在终端执行 `powershell -ExecutionPolicy Bypass -File .\install.ps1`）。
+3. 重启 Antigravity，在右侧插件面板（`AUX_PANE`）打开 **「猫猫壁纸」** 即可自由切换本地 MP4 动态视频、自定义图片、液态玻璃磨砂强度、全局字体色彩与会话栏边缘拖拽宽度。
+
+### 方式二：源码仓库一键安装
+
+```powershell
+git clone https://github.com/Fish-under-sea/Antigravity-maomao.git
+cd Antigravity-maomao
+npm run install:plugin
+```
+
+该命令会自动将插件与运行时安装至 `~/.gemini/config/plugins/antigravity-star-suite/` 并在 `~/.gemini/config/config.json` 中启用。详细插件说明见 [Antigravity-Plugin/README.md](Antigravity-Plugin/README.md)。
 
 <p align="center"><img src="Antigravity-Cat-Widget/assets/character-packs/gemini-star-v1/frames/idle.png" width="260" alt="星语 Gemini 猫娘桌宠"></p>
 
@@ -132,13 +150,12 @@ npm run install:plugin
 
 已知边界：后台额度使用未公开内部接口，可能随版本失配；没有云端计费；没有完成 codex-maid 的全部聊天、持久记忆、多账号、预测与管理功能。Windows 原生窗口跟随已在开发机器验证，所有 DPI、多屏、虚拟桌面及数小时稳定性仍需更多反馈。欢迎通过 Issues 附上版本、重现步骤与脱敏截图。
 
-## 来源与许可
+## 致谢与来源许可
 
-原创软件采用 [MIT](LICENSE)。**MIT 不覆盖角色、美术、品牌标识及第三方音频。** 美术来源与范围见 [ASSETS.md](ASSETS.md)，依赖和音效见 [NOTICE.md](NOTICE.md)。
-
-角色设计参考按提供者记录署名 **ZipZipPipe**；角色与设定集图片由 AI 辅助生成，保留生成提示词，不宣称 Google 官方授权或原设的再许可权。公开版未包含原作者参考图、私人截图或未确认再分发许可的 DSH 鸭叫音频。
-
-交互和产品灵感来自 [codex-maid-widget](https://github.com/Feeesack/codex-maid-widget) 与 [DeepSeek-Balance-Whale-Widget](https://github.com/MeteorNOX/DeepSeek-Balance-Whale-Widget)。感谢这些项目的公开实现与音效来源记录。
+- **上游致谢**：本项目基于 [Monokumakuki/Antigravity-Star-Suite](https://github.com/Monokumakuki/Antigravity-Star-Suite)（星语 · Antigravity Star Suite）深度重构与扩展，由衷感谢原作者 **Monokumakuki** 在星语猫娘桌宠、额度状态机与初代织梦皮肤上的优秀设计与开源贡献。
+- **许可说明**：原创软件代码采用 [MIT](LICENSE)。**MIT 不覆盖角色、美术、品牌标识及第三方音频。** 美术来源与范围见 [ASSETS.md](ASSETS.md)，依赖和音效见 [NOTICE.md](NOTICE.md)。
+- 角色设计参考按提供者记录署名 **ZipZipPipe**；角色与设定集图片由 AI 辅助生成，保留生成提示词，不宣称 Google 官方授权或原设的再许可权。
+- 交互和产品灵感同时致谢 [codex-maid-widget](https://github.com/Feeesack/codex-maid-widget) 与 [DeepSeek-Balance-Whale-Widget](https://github.com/MeteorNOX/DeepSeek-Balance-Whale-Widget)。
 
 ## 0.2.14 窗口行为更新
 

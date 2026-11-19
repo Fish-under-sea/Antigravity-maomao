@@ -1,11 +1,12 @@
 // Serialized into the host by its existing local CDP endpoint. No app files are modified.
 async function installTheme(config) {
   const key = "__agyDreamSkinV2";
-  const THEME_REV = 12;
+  const THEME_REV = 13;
   if (window[key]) {
     if (window[key].owner && window[key].owner !== config.owner) {
       const dead = typeof window[key].lastSeen === "number" && Date.now() - window[key].lastSeen > 15000;
-      if (!dead) throw new Error("皮肤由另一个运行实例管理");
+      const upgrading = typeof window[key].rev === "number" && window[key].rev < THEME_REV;
+      if (!dead && !upgrading) throw new Error("皮肤由另一个运行实例管理");
     }
     if (window[key].owner === config.owner && window[key].rev === THEME_REV && window[key].status().applied) {
       window[key].touch?.();
@@ -42,6 +43,59 @@ async function installTheme(config) {
     const n = Number(v);
     if (!Number.isFinite(n)) return def;
     return Math.min(max, Math.max(min, Math.round(n)));
+  }
+
+  function hexToRgb(hex, fallback) {
+    const c = cleanHex(hex) || fallback;
+    return [
+      parseInt(c.slice(1, 3), 16),
+      parseInt(c.slice(3, 5), 16),
+      parseInt(c.slice(5, 7), 16),
+    ];
+  }
+
+  function mixRgb(a, b, weightA) {
+    const w = Math.max(0, Math.min(1, weightA));
+    return [
+      Math.round(a[0] * w + b[0] * (1 - w)),
+      Math.round(a[1] * w + b[1] * (1 - w)),
+      Math.round(a[2] * w + b[2] * (1 - w)),
+    ];
+  }
+
+  function rgbToHex([r, g, b]) {
+    return (
+      "#" +
+      [r, g, b]
+        .map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0"))
+        .join("")
+    );
+  }
+
+  function syncTitleBarOverlay(cfg, isDark) {
+    const setOverlay = window.electronNative?.setTitleBarOverlay;
+    if (typeof setOverlay !== "function") return;
+    try {
+      const g = cfg?.glass || {};
+      const starNeko = g.themeStyle !== "official";
+      const sbFill = clampInt(g.regions?.sidebar?.fill, 78, 0, 100) / 100;
+      const tintRgb = hexToRgb(g.tint, isDark ? "#ffffff" : "#f8fafc");
+      const baseRgb = hexToRgb(
+        starNeko ? (isDark ? "#151221" : "#f3edfc") : isDark ? "#121319" : "#ffffff",
+        "#151221"
+      );
+      const backdropRgb = hexToRgb(
+        starNeko ? (isDark ? "#262235" : "#ede4f7") : isDark ? "#161822" : "#edeff6",
+        "#262235"
+      );
+      const surfaceRgb = mixRgb(tintRgb, baseRgb, isDark ? (starNeko ? 0.1 : 0.11) : 0.24);
+      const finalRgb = mixRgb(surfaceRgb, backdropRgb, Math.max(0.5, sbFill));
+      const mainFg = cleanHex(cfg?.font?.colors?.main) || (isDark ? "#f3edfc" : "#1e1b2e");
+      setOverlay({
+        color: rgbToHex(finalRgb),
+        symbolColor: mainFg,
+      });
+    } catch {}
   }
 
   function fontRules(colors) {
@@ -217,7 +271,7 @@ async function installTheme(config) {
   --agy-glass-bar-blur: ${brBlur}px;
   --lg-filter-sidebar: ${makeFilter(sbBlur, 10)};
   --lg-filter-content: ${makeFilter(ctBlur, 10)};
-  --lg-filter-overlay: ${ovBlur > 0 ? makeFilter(Math.max(ovBlur, 12), 14) : "none"};
+  --lg-filter-overlay: ${ovBlur > 0 ? makeFilter(Math.max(ovBlur, 16), 20) : "none"};
   --lg-filter-control: ${makeFilter(clBlur, 12)};
   --lg-filter-header: ${makeFilter(hdBlur, 10)};
   --lg-filter-bar: ${makeFilter(brBlur, 10)};
@@ -472,12 +526,22 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
  }
  html.agy-dream-active-v2 [data-agy-dream-welcome] { padding-top: 0 !important; justify-content: flex-end !important; padding-bottom: 28px !important; }
  html.agy-dream-active-v2 .agy-inset-shell { background-color: transparent !important; }
- /* 左侧/顶部面板利用外扩同色凹角阴影无缝填补 .agy-sheet 四角圆角空缺，消除 1px 缝隙与内层重影线 */
+ html.agy-dream-active-v2 .agy-inset-shell :is([class*="bg-[var(--shell-canvas)]"], [style*="var(--shell-canvas)"]) {
+   background-color: transparent !important;
+   background-image: none !important;
+ }
+ /* 左侧/顶部/右侧/底部统一利用外扩同色凹角阴影无缝填补 .agy-sheet 四角圆角过渡，消除直角黑块与重影线 */
  html.agy-dream-active-v2 [data-testid="sidebar-split"] > [data-split-sash="true"] {
    background-color: var(--sidebar) !important;
  }
  html.agy-dream-active-v2 [data-split-root="true"] > [data-split-fill-edge="left"]:has(> .agy-sheet) {
    overflow: hidden !important;
+   padding: 0 8px 8px 0 !important;
+   box-sizing: border-box !important;
+ }
+ html.agy-dream-active-v2 [data-split-root="true"]:has(> .flex:first-child[style*="width: 0"]) > [data-split-fill-edge="left"]:has(> .agy-sheet),
+ html.agy-dream-active-v2 [data-split-root="true"] > [data-split-fill-edge="left"]:has(> .agy-sheet[data-sidebar-closed]) {
+   padding-left: 8px !important;
  }
  html.agy-dream-active-v2 .agy-sheet {
    border-radius: var(--agy-radius-outer, 20px) !important;
@@ -486,28 +550,33 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
      0 0 0 36px var(--sidebar),
      inset 0 0 0 1px var(--lg-rim-line) !important;
  }
+ html.agy-dream-active-v2 .agy-sheet[data-sheet-inset] :is([data-main-content-body], [data-side-panel-body]),
  html.agy-dream-active-v2 .agy-sheet[data-sheet-inset="true"] [data-main-content-body="true"] {
    margin: 0 !important;
    border-radius: 0 !important;
+   box-shadow: none !important;
+   clip-path: none !important;
  }
  html.agy-dream-active-v2 .agy-sheet[data-sheet-inset="true"] [data-main-content-header] {
    padding-right: 14px !important;
  }
  html.agy-dream-active-v2 [data-main-content-body="true"]::before,
  html.agy-dream-active-v2 [data-main-content-body="true"]::after,
+ html.agy-dream-active-v2 [data-side-panel-body]::before,
+ html.agy-dream-active-v2 [data-side-panel-body]::after,
  html.agy-dream-active-v2 [data-testid="aux-pane-split"] .flex-grow.overflow-hidden:has([data-testid="sidecar-iframe"])::after {
    display: none !important;
    box-shadow: none !important;
  }
 
- /* 侧边栏区域：仅最外层挂载一层烟熏液态玻璃，彻底消除嵌套 .bg-sidebar 二次叠层与滚动模糊掉帧 */
+ /* 侧边栏区域：仅最外层挂载一层烟熏液态玻璃，彻底消除嵌套 .bg-sidebar 二次叠层与滚动模糊掉帧（排除顶栏下拉浮层菜单） */
  html.agy-dream-active-v2 :is(.bg-sidebar, aside, [role=navigation]):not([data-testid="title-menu-bar"]):not(:is(.bg-sidebar, aside, [role=navigation]) *) {
    background-color: color-mix(in srgb, var(--lg-surface) var(--agy-glass-sidebar-fill, 78%), transparent) !important;
    -webkit-backdrop-filter: var(--lg-filter-sidebar, blur(18px) saturate(165%)) !important;
    backdrop-filter: var(--lg-filter-sidebar, blur(18px) saturate(165%)) !important;
    border-color: var(--lg-rim-line) !important;
  }
- html.agy-dream-active-v2 :is(.bg-sidebar, aside, [role=navigation]) :is(.bg-sidebar, [data-sidebar-section-drop-id], [data-testid="pinned-section-header"], .group\/section-header) {
+ html.agy-dream-active-v2 :is(.bg-sidebar, aside, [role=navigation]) :is(.bg-sidebar:not([data-browser-occluder="true"]):not(.surface-opaque), [data-sidebar-section-drop-id], [data-testid="pinned-section-header"], .group\/section-header) {
    background-color: transparent !important;
    background-image: none !important;
    -webkit-backdrop-filter: none !important;
@@ -652,9 +721,11 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
    border-radius: var(--agy-radius-inner, 11px) !important;
  }
 
- /* 浮层、菜单与对话框 + 斜杠清单 [data-mention-menu] 液态玻璃 + 圆角重设计 */
+ /* 浮层、顶栏下拉菜单、对话框 + 斜杠清单 [data-mention-menu] 液态磨砂玻璃 + 圆角重设计 */
  html.agy-dream-active-v2 :is(
    [data-mention-menu][role="listbox"],
+   [data-browser-occluder="true"],
+   [data-testid="title-menu-bar"] .surface-opaque,
    .typeahead-popover.mentions-menu,
    .agy-overlay,
    [data-popover-popup],
@@ -665,16 +736,19 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
    [role=dialog]
  ) {
    z-index: 9999 !important;
-   background-color: color-mix(in srgb, var(--lg-pop-surface) var(--agy-glass-overlay-fill, 68%), var(--lg-overlay-wash)) !important;
+   background-color: color-mix(in srgb, var(--lg-pop-surface) max(var(--agy-glass-overlay-fill, 68%), 82%), var(--lg-overlay-wash)) !important;
    background-image:
      radial-gradient(420px 110px at 14% -12px, color-mix(in srgb, var(--lg-tint, #ffffff) 22%, rgba(255, 255, 255, .12)) 0%, transparent 62%),
      linear-gradient(175deg, rgba(255, 255, 255, .055) 0%, transparent 72%) !important;
-   -webkit-backdrop-filter: var(--lg-filter-overlay, blur(24px) saturate(165%)) !important;
-   backdrop-filter: var(--lg-filter-overlay, blur(24px) saturate(165%)) !important;
+   -webkit-backdrop-filter: var(--lg-filter-overlay, blur(22px) saturate(165%)) !important;
+   backdrop-filter: var(--lg-filter-overlay, blur(22px) saturate(165%)) !important;
    border: 1px solid var(--lg-rim-line) !important;
    border-radius: var(--agy-radius-card, 16px) !important;
    box-shadow: inset 0 1px 0 var(--lg-rim-inset-top), inset 0 -1px 0 var(--lg-rim-shade), var(--lg-shadow-pop) !important;
    color: var(--foreground) !important;
+ }
+ html.agy-dream-active-v2 [data-browser-occluder="true"] :is(button, [role="menuitem"], .cursor-pointer) {
+   border-radius: var(--agy-radius-badge, 6px) !important;
  }
 
  /* 斜杠清单内部列表项层次与同心圆角高对比可读性 */
@@ -1195,6 +1269,8 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
       if (
         bg !== "rgba(0, 0, 0, 0)" &&
         bg !== "transparent" &&
+        !el.hasAttribute("data-main-content-body") &&
+        !el.hasAttribute("data-side-panel-body") &&
         !el.querySelector?.("[data-testid=sidecar-iframe]") &&
         (el.matches("aside,nav,header,[role=navigation]") ||
           (rect.width >= 140 && rect.width < innerWidth * 0.35 && rect.height > innerHeight * 0.55) ||
@@ -1259,6 +1335,7 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
     scrimEl.style.backgroundColor = (dark ? "rgba(10,11,16," : "rgba(244,245,250,") + scrimAlpha + ")";
 
     tokenStyle.textContent = buildTokenCss(config, dark);
+    syncTitleBarOverlay(config, dark);
 
     const nextSrc = config.mediaUrl || config.image || "";
     const nextKind = config.mediaKind === "video" ? "video" : "image";
@@ -1284,6 +1361,12 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
     document.getElementById?.("agy-dream-width-badge")?.remove();
     document.documentElement.style.removeProperty("--agy-chat-width");
     document.documentElement.style.removeProperty("--max-conversation-width");
+    try {
+      window.electronNative?.setTitleBarOverlay?.({
+        color: dark ? "#000000" : "#ffffff",
+        symbolColor: dark ? "#ffffff" : "#000000",
+      });
+    } catch {}
     releaseMedia();
     layer.remove();
     style.remove();

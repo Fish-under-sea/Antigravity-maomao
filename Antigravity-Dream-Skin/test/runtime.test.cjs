@@ -33,7 +33,7 @@ function fixture(){
     const payload=JSON.parse(expression.slice(expression.lastIndexOf(")({")+2,-1));
     applied.push(payload);
     if(blockApply){const gate=blockApply;blockApply=null;await gate;}
-    state={themed:true,owner:payload.owner,rev:12};
+    state={themed:true,owner:payload.owner,rev:13};
     return {applied:true};
    }
    if(expression.includes("touch?.()")){
@@ -488,7 +488,7 @@ test('DreamSkinSettings sanitizes videoSmoothMode and chatWidth, and HostControl
 
  let patched=null;
  let applyCount=0;
- let state={ready:'complete',themed:true,owner:'drag-owner',rev:12,stale:false,chatWidth:91};
+ let state={ready:'complete',themed:true,owner:'drag-owner',rev:13,stale:false,chatWidth:91};
  const client={
   closed:false,
   async evaluate(expression){
@@ -558,8 +558,9 @@ test('installTheme REV 10 eliminates black fades, slims scrollbars, optimizes 4K
  const headEl=makeEl('head');
  const docEl=makeEl('html');
  const origGlobals={window:global.window,document:global.document,getComputedStyle:global.getComputedStyle,MutationObserver:global.MutationObserver,ResizeObserver:global.ResizeObserver,innerWidth:global.innerWidth,innerHeight:global.innerHeight};
+ const overlayCalls=[];
  try{
-  global.window={};
+  global.window={electronNative:{setTitleBarOverlay:arg=>overlayCalls.push(arg)}};
   global.document={documentElement:docEl,head:headEl,body:bodyEl,hidden:false,addEventListener(){},removeEventListener(){},createElement:tag=>makeEl(tag),querySelector:sel=>sel==='#root'?rootEl:null,querySelectorAll:()=>[]};
   global.getComputedStyle=()=>({backgroundColor:'rgb(20, 20, 28)',backgroundImage:'none'});
   global.MutationObserver=class{observe(){}disconnect(){}};
@@ -579,15 +580,20 @@ test('installTheme REV 10 eliminates black fades, slims scrollbars, optimizes 4K
   });
   const baseCss=headEl.children.find(c=>c.id==='agy-dream-style-v2')?.textContent||'';
   const tokenCss=headEl.children.find(c=>c.id==='agy-dream-tokens-v2')?.textContent||'';
-  assert.equal(global.window.__agyDreamSkinV2.rev,12);
+  assert.equal(global.window.__agyDreamSkinV2.rev,13);
   assert.equal(narrowScrollbar.hasAttribute('data-agy-dream-chrome'),false);
   assert.equal(rootEl.getAttribute('data-agy-chat-width'),'custom');
+  assert.equal(overlayCalls.length,1);
+  assert.equal(overlayCalls[0].color,'#2b2837');
+  assert.equal(overlayCalls[0].symbolColor,'#f3edfc');
   assert.match(baseCss,/\[data-testid="overlay-scrollbar-thumb"\][\s\S]*width:\s*3px\s*!important/);
   assert.match(baseCss,/::-webkit-scrollbar\s*\{[\s\S]*width:\s*4px\s*!important/);
   assert.match(baseCss,/\.md-sticky-message-bleed::before/);
   assert.match(baseCss,/from-sidebar/);
   assert.match(baseCss,/\.agy-dream-width-handle\[data-mode="rail"\]/);
   assert.match(baseCss,/--agy-overview-dodge/);
+  assert.match(baseCss,/\[data-browser-occluder="true"\]/);
+  assert.match(baseCss,/padding:\s*0\s+8px\s+8px\s+0\s*!important/);
   assert.match(baseCss,/z-index:\s*9999\s*!important/);
   assert.match(baseCss,/\[data-testid="title-menu-bar"\][\s\S]*z-index:\s*60\s*!important/);
   assert.doesNotMatch(baseCss,/rgba\(0,\s*0,\s*0,\s*0\.56\)/);
@@ -611,6 +617,7 @@ test('installTheme REV 10 eliminates black fades, slims scrollbars, optimizes 4K
   assert.match(tokenFull,/--lg-filter-content:\s*blur\(22px\)\s*saturate\(165%\);/);
   assert.doesNotMatch(tokenFull,/--max-conversation-width:/);
   global.window.__agyDreamSkinV2.destroy();
+  assert.deepEqual(overlayCalls[overlayCalls.length-1],{color:'#000000',symbolColor:'#ffffff'});
  }finally{
   Object.assign(global,origGlobals);
  }
@@ -627,7 +634,7 @@ test('HostController upgrades legacy rev 9 plugin owner while still leaving unre
    if(expression.startsWith('(async function installTheme')){
     const payload=JSON.parse(expression.slice(expression.lastIndexOf(')({')+2,-1));
     applied.push(payload);
-    state={themed:true,owner:payload.owner,rev:12};
+    state={themed:true,owner:payload.owner,rev:13};
     return {applied:true};
    }
    if(expression.includes('destroy()')){destroys++;state={themed:false};return null;}

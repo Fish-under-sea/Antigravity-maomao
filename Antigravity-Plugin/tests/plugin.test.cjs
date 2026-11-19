@@ -106,7 +106,7 @@ test("sidecar service HTTP endpoints manage Dream Skin MP4/preset switching and 
   // 1. Static panel assets respond 200
   const htmlRes = await fetch(`${httpSrv.url}/`);
   assert.equal(htmlRes.status, 200);
-  assert.match(await htmlRes.text(), /星语 · Dream Skin/);
+  assert.match(await htmlRes.text(), /猫猫壁纸/);
 
   const pngRes = await fetch(`${httpSrv.url}/preset-wallpaper.png`);
   assert.equal(pngRes.status, 200);
