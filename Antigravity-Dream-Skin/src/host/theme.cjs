@@ -1,7 +1,7 @@
 // Serialized into the host by its existing local CDP endpoint. No app files are modified.
 async function installTheme(config) {
   const key = "__agyDreamSkinV2";
-  const THEME_REV = 10;
+  const THEME_REV = 11;
   if (window[key]) {
     if (window[key].owner && window[key].owner !== config.owner) {
       const dead = typeof window[key].lastSeen === "number" && Date.now() - window[key].lastSeen > 15000;
@@ -310,7 +310,7 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
    border-radius: var(--agy-radius-badge, 6px) !important;
  }
  html.agy-dream-active-v2 [data-agy-dream-fade],
- html.agy-dream-active-v2 [data-agy-dream-root] :is(.pointer-events-none, [data-agy-dream-fade]):is([style*="linear-gradient"], [style*="var(--background)"], [style*="var(--sidebar)"]) {
+ html.agy-dream-active-v2 [data-agy-dream-root] :is(.pointer-events-none, [data-agy-dream-fade]):is([style*="linear-gradient"], [style*="var(--background)"], [style*="var(--sidebar)"], [class*="bg-linear"], [class*="bg-gradient"]) {
    background: transparent !important;
    background-image: none !important;
    box-shadow: none !important;
@@ -325,7 +325,7 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
    background: transparent !important;
    background-image: none !important;
  }
- html.agy-dream-active-v2 .agy-sheet :is(.bg-background, [class*="from-background"], [class*="to-background"], [class*="via-background"]):not(.monaco-editor, .monaco-editor *, .xterm, .xterm *, pre, pre *, code, code *, [role=dialog], [role=dialog] *, [role=menu], [role=menu] *, [data-mention-menu], [data-mention-menu] *, [data-popover-popup], [data-popover-popup] *) {
+ html.agy-dream-active-v2 :is(.agy-sheet, .bg-sidebar, aside, [role=navigation]) :is(.bg-background, [class*="from-background"], [class*="to-background"], [class*="via-background"], [class*="from-sidebar"], [class*="to-sidebar"], [class*="via-sidebar"]):not(.monaco-editor, .monaco-editor *, .xterm, .xterm *, pre, pre *, code, code *, [role=dialog], [role=dialog] *, [role=menu], [role=menu] *, [data-mention-menu], [data-mention-menu] *, [data-popover-popup], [data-popover-popup] *) {
    background-color: transparent !important;
    background-image: none !important;
  }
@@ -393,7 +393,7 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
  html.agy-dream-active-v2 ::-webkit-scrollbar-thumb:hover {
    background: color-mix(in srgb, var(--foreground) 44%, transparent) !important;
  }
- /* 会话流与输入框宽度适配 + 左右边缘拖动把手 */
+ /* 会话流与输入框宽度适配 + 全高边缘渐隐拖动导轨（靠近显影、鼠标指针变 ew-resize） */
  html.agy-dream-active-v2[data-agy-chat-width="custom"] [data-testid="conversation-view"] [style*="--max-conversation-width"] {
    max-width: var(--agy-chat-width) !important;
  }
@@ -401,8 +401,8 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
    position: absolute;
    top: 8px;
    bottom: 8px;
-   width: 10px;
-   z-index: 40;
+   width: 12px;
+   z-index: 35;
    cursor: ew-resize;
    display: flex;
    align-items: center;
@@ -412,19 +412,45 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
  }
  html.agy-dream-active-v2 .agy-dream-width-handle[data-side="left"] { left: -6px; }
  html.agy-dream-active-v2 .agy-dream-width-handle[data-side="right"] { right: -6px; }
+ html.agy-dream-active-v2 .agy-dream-width-handle[data-mode="rail"] {
+   top: 12px;
+   bottom: 12px;
+   left: auto;
+   right: auto;
+   width: 14px;
+   z-index: 25;
+ }
  html.agy-dream-active-v2 .agy-dream-width-handle::after {
    content: "";
    width: 2px;
-   height: 28px;
+   height: 44px;
    border-radius: 9999px;
-   background: color-mix(in srgb, var(--foreground) 24%, transparent);
-   opacity: 0.25;
-   transition: opacity 120ms ease, height 120ms ease, background-color 120ms ease;
+   background: linear-gradient(
+     180deg,
+     transparent 0%,
+     color-mix(in srgb, var(--primary, #a88ee5) 42%, rgba(255, 255, 255, 0.45)) 22%,
+     color-mix(in srgb, var(--primary, #a88ee5) 85%, rgba(255, 255, 255, 0.92)) 50%,
+     color-mix(in srgb, var(--primary, #a88ee5) 42%, rgba(255, 255, 255, 0.45)) 78%,
+     transparent 100%
+   );
+   box-shadow: 0 0 10px color-mix(in srgb, var(--primary, #a88ee5) 45%, transparent);
+   opacity: 0;
+   transition: opacity 150ms ease, width 120ms ease;
+   pointer-events: none;
+ }
+ html.agy-dream-active-v2 .agy-dream-width-handle[data-mode="rail"]::after {
+   position: absolute;
+   left: 50%;
+   top: var(--agy-rail-y, 50%);
+   width: 2.5px;
+   height: 150px;
+   transform: translate(-50%, -50%);
  }
  html.agy-dream-active-v2 .agy-dream-width-handle:is(:hover, [data-dragging="1"])::after {
-   opacity: 0.95;
-   height: 40px;
-   background: var(--primary, #a88ee5);
+   opacity: 1;
+ }
+ html.agy-dream-active-v2 .agy-dream-width-handle[data-mode="rail"][data-dragging="1"]::after {
+   width: 3px;
  }
  #agy-dream-width-badge {
    position: fixed;
@@ -922,7 +948,24 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
       resize.observe(root);
       geometryTarget = root;
     }
+    syncChatRails();
     return { region: root, scope: pane || root, width, height };
+  }
+
+  function syncChatRails() {
+    const convView = root.querySelector?.('[data-testid="conversation-view"]');
+    if (!convView) return;
+    const col = convView.querySelector?.(".mx-auto.w-full") || convView.querySelector?.(".surface-composer");
+    if (!col) return;
+    const vr = convView.getBoundingClientRect();
+    const cr = col.getBoundingClientRect();
+    if (vr.width <= 0 || cr.width <= 0) return;
+    const relLeft = Math.max(10, Math.round(cr.left - vr.left));
+    const relRight = Math.min(Math.round(vr.width - 14), Math.round(cr.right - vr.left));
+    const leftRail = convView.querySelector?.('.agy-dream-width-handle[data-side="left"]');
+    const rightRail = convView.querySelector?.('.agy-dream-width-handle[data-side="right"]');
+    if (leftRail) leftRail.style.left = Math.max(0, relLeft - 14) + "px";
+    if (rightRail) rightRail.style.left = relRight + "px";
   }
 
   function applyCommittedChatWidth(pct) {
@@ -933,92 +976,129 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
     document.documentElement.style.removeProperty("--agy-chat-width");
     document.documentElement.style.removeProperty("--max-conversation-width");
     tokenStyle.textContent = buildTokenCss(config, dark);
+    syncChatRails();
+  }
+
+  function createEdgeHandle(side, mode, getMetrics) {
+    const handle = document.createElement("div");
+    handle.className = "agy-dream-width-handle";
+    handle.setAttribute("data-side", side);
+    handle.setAttribute("data-mode", mode);
+    handle.title = "左右拖动调整会话框宽度（双击还原官方默认）";
+    handle.addEventListener("dblclick", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      applyCommittedChatWidth(0);
+    });
+    if (mode === "rail") {
+      handle.addEventListener("pointermove", (ev) => {
+        if (handle.getAttribute("data-dragging") === "1") return;
+        const hr = handle.getBoundingClientRect();
+        handle.style.setProperty("--agy-rail-y", Math.round(ev.clientY - hr.top) + "px");
+      });
+    }
+    handle.addEventListener("pointerdown", (ev) => {
+      if (ev.button !== 0) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      dragCleanup?.();
+      const isLeft = side === "left";
+      const { paneInnerW, startW } = getMetrics();
+      const minW = Math.min(480, paneInnerW);
+      const startX = ev.clientX;
+      let latestPct = clampInt(Math.round((startW / paneInnerW) * 100), 75, 45, 100);
+      let moveRaf = 0;
+      let moveClientX = ev.clientX;
+      let moveClientY = ev.clientY;
+      handle.setAttribute("data-dragging", "1");
+
+      const badge = document.createElement("div");
+      badge.id = "agy-dream-width-badge";
+      document.body.append(badge);
+
+      const syncDragFrame = () => {
+        moveRaf = 0;
+        const dx = moveClientX - startX;
+        const targetPx = Math.round(Math.max(minW, Math.min(paneInnerW, startW + (isLeft ? -2 : 2) * dx)));
+        latestPct = clampInt(Math.round((targetPx / paneInnerW) * 100), 75, 45, 100);
+        root.setAttribute("data-agy-chat-width", "custom");
+        document.documentElement.style.setProperty("--agy-chat-width", targetPx + "px");
+        document.documentElement.style.setProperty("--max-conversation-width", targetPx + "px", "important");
+        if (mode === "rail") {
+          const hr = handle.getBoundingClientRect();
+          handle.style.setProperty("--agy-rail-y", Math.round(moveClientY - hr.top) + "px");
+          syncChatRails();
+        }
+        badge.style.left = moveClientX + "px";
+        badge.style.top = Math.max(36, moveClientY) + "px";
+        badge.textContent = `宽度 ${latestPct}% (${targetPx}px)`;
+      };
+
+      const onMove = (mv) => {
+        moveClientX = mv.clientX;
+        moveClientY = mv.clientY;
+        if (!moveRaf && typeof requestAnimationFrame === "function") {
+          moveRaf = requestAnimationFrame(syncDragFrame);
+        }
+      };
+
+      const finishDrag = () => {
+        if (moveRaf && typeof cancelAnimationFrame === "function") cancelAnimationFrame(moveRaf);
+        syncDragFrame();
+        handle.removeAttribute("data-dragging");
+        badge.remove();
+        window.removeEventListener("pointermove", onMove, true);
+        window.removeEventListener("pointerup", finishDrag, true);
+        window.removeEventListener("pointercancel", finishDrag, true);
+        dragCleanup = null;
+        applyCommittedChatWidth(latestPct);
+      };
+
+      dragCleanup = () => {
+        if (moveRaf && typeof cancelAnimationFrame === "function") cancelAnimationFrame(moveRaf);
+        handle.removeAttribute("data-dragging");
+        badge.remove();
+        window.removeEventListener("pointermove", onMove, true);
+        window.removeEventListener("pointerup", finishDrag, true);
+        window.removeEventListener("pointercancel", finishDrag, true);
+      };
+
+      window.addEventListener("pointermove", onMove, true);
+      window.addEventListener("pointerup", finishDrag, true);
+      window.addEventListener("pointercancel", finishDrag, true);
+      syncDragFrame();
+    });
+    return handle;
   }
 
   function attachResizeHandles() {
+    const convView = root.querySelector?.('[data-testid="conversation-view"]');
+    if (convView) {
+      for (const old of root.querySelectorAll('.surface-composer > .agy-dream-width-handle')) old.remove();
+      if (!convView.querySelector('.agy-dream-width-handle[data-mode="rail"]')) {
+        const getMetrics = () => {
+          const col = convView.querySelector(".mx-auto.w-full") || convView.querySelector(".surface-composer");
+          const paneInnerW = Math.max(480, convView.clientWidth - 36);
+          const startW = col ? col.getBoundingClientRect().width : Math.min(768, paneInnerW);
+          return { paneInnerW, startW };
+        };
+        convView.append(createEdgeHandle("left", "rail", getMetrics));
+        convView.append(createEdgeHandle("right", "rail", getMetrics));
+      }
+      syncChatRails();
+      return;
+    }
     for (const composer of root.querySelectorAll(".surface-composer")) {
       if (composer.querySelector(".agy-dream-width-handle")) continue;
-      for (const side of ["left", "right"]) {
-        const handle = document.createElement("div");
-        handle.className = "agy-dream-width-handle";
-        handle.setAttribute("data-side", side);
-        handle.title = "左右拖动调整会话框宽度（双击还原官方默认）";
-        handle.addEventListener("dblclick", (ev) => {
-          ev.preventDefault();
-          ev.stopPropagation();
-          applyCommittedChatWidth(0);
-        });
-        handle.addEventListener("pointerdown", (ev) => {
-          if (ev.button !== 0) return;
-          ev.preventDefault();
-          ev.stopPropagation();
-          dragCleanup?.();
-          const isLeft = side === "left";
-          const maxWrap = composer.closest?.('[style*="--max-conversation-width"]') || composer.parentElement;
-          const paneWrap = maxWrap?.parentElement || document.querySelector?.('[data-testid="conversation-view"]');
-          const paneInnerW = Math.max(480, (paneWrap ? paneWrap.clientWidth : innerWidth) - 32);
-          const minW = Math.min(480, paneInnerW);
-          const startW = (maxWrap || composer).getBoundingClientRect().width || Math.min(768, paneInnerW);
-          const startX = ev.clientX;
-          let latestPct = clampInt(Math.round((startW / paneInnerW) * 100), 75, 45, 100);
-          let moveRaf = 0;
-          let moveClientX = ev.clientX;
-          let moveClientY = ev.clientY;
-          handle.setAttribute("data-dragging", "1");
-
-          const badge = document.createElement("div");
-          badge.id = "agy-dream-width-badge";
-          document.body.append(badge);
-
-          const syncDragFrame = () => {
-            moveRaf = 0;
-            const dx = moveClientX - startX;
-            const targetPx = Math.round(Math.max(minW, Math.min(paneInnerW, startW + (isLeft ? -2 : 2) * dx)));
-            latestPct = clampInt(Math.round((targetPx / paneInnerW) * 100), 75, 45, 100);
-            root.setAttribute("data-agy-chat-width", "custom");
-            document.documentElement.style.setProperty("--agy-chat-width", targetPx + "px");
-            document.documentElement.style.setProperty("--max-conversation-width", targetPx + "px", "important");
-            badge.style.left = moveClientX + "px";
-            badge.style.top = Math.max(36, moveClientY) + "px";
-            badge.textContent = `宽度 ${latestPct}% (${targetPx}px)`;
-          };
-
-          const onMove = (mv) => {
-            moveClientX = mv.clientX;
-            moveClientY = mv.clientY;
-            if (!moveRaf && typeof requestAnimationFrame === "function") {
-              moveRaf = requestAnimationFrame(syncDragFrame);
-            }
-          };
-
-          const finishDrag = () => {
-            if (moveRaf && typeof cancelAnimationFrame === "function") cancelAnimationFrame(moveRaf);
-            syncDragFrame();
-            handle.removeAttribute("data-dragging");
-            badge.remove();
-            window.removeEventListener("pointermove", onMove, true);
-            window.removeEventListener("pointerup", finishDrag, true);
-            window.removeEventListener("pointercancel", finishDrag, true);
-            dragCleanup = null;
-            applyCommittedChatWidth(latestPct);
-          };
-
-          dragCleanup = () => {
-            if (moveRaf && typeof cancelAnimationFrame === "function") cancelAnimationFrame(moveRaf);
-            handle.removeAttribute("data-dragging");
-            badge.remove();
-            window.removeEventListener("pointermove", onMove, true);
-            window.removeEventListener("pointerup", finishDrag, true);
-            window.removeEventListener("pointercancel", finishDrag, true);
-          };
-
-          window.addEventListener("pointermove", onMove, true);
-          window.addEventListener("pointerup", finishDrag, true);
-          window.addEventListener("pointercancel", finishDrag, true);
-          syncDragFrame();
-        });
-        composer.append(handle);
-      }
+      const getMetrics = () => {
+        const maxWrap = composer.closest?.('[style*="--max-conversation-width"]') || composer.parentElement;
+        const paneWrap = maxWrap?.parentElement;
+        const paneInnerW = Math.max(480, (paneWrap ? paneWrap.clientWidth : innerWidth) - 32);
+        const startW = (maxWrap || composer).getBoundingClientRect().width || Math.min(768, paneInnerW);
+        return { paneInnerW, startW };
+      };
+      composer.append(createEdgeHandle("left", "composer", getMetrics));
+      composer.append(createEdgeHandle("right", "composer", getMetrics));
     }
   }
 

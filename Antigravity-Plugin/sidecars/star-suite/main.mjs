@@ -1,3 +1,5 @@
+import crypto from "node:crypto";
+import { execFile } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
@@ -113,6 +115,8 @@ export async function createStarSuiteService(options = {}) {
       getHideTray: () => settings.get("widgetHideTray") !== false,
     });
 
+  const instanceOwner = options.owner || `antigravity-star-suite-${process.pid}-${crypto.randomUUID().slice(0, 8)}`;
+
   const controller = new HostController(
     loader,
     () => {
@@ -121,7 +125,7 @@ export async function createStarSuiteService(options = {}) {
       }
     },
     {
-      owner: options.owner || "antigravity-star-suite-plugin",
+      owner: instanceOwner,
       discover: options.discover,
       createClient: options.createClient,
       onHostPatch: (patch) => {
@@ -571,10 +575,19 @@ async function runSidecarRuntime() {
     console.log(`[star-suite] standalone panel preview running at ${standalone.url}`);
   }
 
+  let watchdogTimer = null;
+  let lockFile = "";
   let shuttingDown = false;
   const shutdown = async () => {
     if (shuttingDown) return;
     shuttingDown = true;
+    if (watchdogTimer) clearInterval(watchdogTimer);
+    if (lockFile) {
+      try {
+        const cur = JSON.parse(fs.readFileSync(lockFile, "utf8"));
+        if (cur && cur.pid === process.pid) fs.unlinkSync(lockFile);
+      } catch {}
+    }
     try {
       if (closeHttp) await closeHttp();
     } catch {}
@@ -583,6 +596,54 @@ async function runSidecarRuntime() {
     } catch {}
     process.exit(0);
   };
+
+  if (process.env.ANTIGRAVITY_SIDECAR_WEB_PORT) {
+    const lockDir = path.join(os.homedir(), ".antigravity-dream-skin");
+    lockFile = path.join(lockDir, "star-suite-sidecar.pid.json");
+    try {
+      fs.mkdirSync(lockDir, { recursive: true });
+      fs.writeFileSync(lockFile, JSON.stringify({ pid: process.pid, ppid: process.ppid, startedAt: Date.now() }), "utf8");
+    } catch {}
+
+    const isPidAlive = (pid) => {
+      if (!pid || pid <= 1) return true;
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch (err) {
+        return err && err.code === "EPERM";
+      }
+    };
+
+    let grandparentPid = 0;
+    if (process.platform === "win32" && process.ppid > 1) {
+      execFile(
+        "powershell.exe",
+        ["-NoProfile", "-NonInteractive", "-Command", `(Get-CimInstance Win32_Process -Filter 'ProcessId=${process.ppid}').ParentProcessId`],
+        { encoding: "utf8", windowsHide: true, timeout: 5000 },
+        (err, stdout) => {
+          if (!err) {
+            const parsed = Number(String(stdout || "").trim());
+            if (Number.isInteger(parsed) && parsed > 1) grandparentPid = parsed;
+          }
+        }
+      );
+    }
+
+    watchdogTimer = setInterval(() => {
+      if (!isPidAlive(process.ppid) || (grandparentPid > 1 && !isPidAlive(grandparentPid))) {
+        shutdown();
+        return;
+      }
+      try {
+        const lock = JSON.parse(fs.readFileSync(lockFile, "utf8"));
+        if (lock && typeof lock.pid === "number" && lock.pid !== process.pid && isPidAlive(lock.pid)) {
+          shutdown();
+        }
+      } catch {}
+    }, 4000);
+    watchdogTimer.unref?.();
+  }
 
   process.on("SIGTERM", shutdown);
   process.on("SIGINT", shutdown);

@@ -317,4 +317,18 @@ test("media picker uses UTF-8 UTF-16LE encoded PowerShell args and web preview a
   const body = await res.json();
   assert.equal(body.settings.chatWidth, 86);
   assert.equal(body.settings.videoSmoothMode, false);
+
+  const s2 = await createStarSuiteService({
+    settingsFile: path.join(tmpDir, "settings2.json"),
+    discover: async () => null,
+    widgetSupervisor: { status: () => ({ available: false, running: false }) },
+    autoTick: false,
+    autoStartWidget: false,
+  });
+  try {
+    assert.notEqual(service.controller.owner, s2.controller.owner);
+    assert.match(service.controller.owner, /^antigravity-star-suite-\d+-/);
+  } finally {
+    await s2.stop();
+  }
 });

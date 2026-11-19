@@ -63,7 +63,15 @@ class HostController {
         });
         return;
       }
-      if (current.themed && current.owner !== this.owner && !current.stale) {
+      const canUpgradeLegacy =
+        current.themed &&
+        current.owner !== this.owner &&
+        !current.stale &&
+        typeof current.rev === "number" &&
+        current.rev > 0 &&
+        current.rev < 11 &&
+        current.owner === "antigravity-star-suite-plugin";
+      if (current.themed && current.owner !== this.owner && !current.stale && !canUpgradeLegacy) {
         this.report({ connected: true, applied: false, message: "已连接 · 皮肤由另一个运行实例管理" });
         return;
       }
@@ -88,7 +96,7 @@ class HostController {
         }
       }
       const signature = JSON.stringify(effectiveSettings);
-      if (!current.themed || current.stale || current.rev !== 10 || signature !== this.signature) {
+      if (!current.themed || current.stale || current.rev !== 11 || signature !== this.signature) {
         const payload = { ...this.loader.payload(effectiveSettings), owner: this.owner };
         const result = await this.client.evaluate("(" + installTheme.toString() + ")(" + JSON.stringify(payload) + ")");
         this.signature = signature;

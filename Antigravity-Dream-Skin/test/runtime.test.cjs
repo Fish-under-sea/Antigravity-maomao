@@ -33,7 +33,7 @@ function fixture(){
     const payload=JSON.parse(expression.slice(expression.lastIndexOf(")({")+2,-1));
     applied.push(payload);
     if(blockApply){const gate=blockApply;blockApply=null;await gate;}
-    state={themed:true,owner:payload.owner,rev:10};
+    state={themed:true,owner:payload.owner,rev:11};
     return {applied:true};
    }
    if(expression.includes("touch?.()")){
@@ -488,7 +488,7 @@ test('DreamSkinSettings sanitizes videoSmoothMode and chatWidth, and HostControl
 
  let patched=null;
  let applyCount=0;
- let state={ready:'complete',themed:true,owner:'drag-owner',rev:10,stale:false,chatWidth:91};
+ let state={ready:'complete',themed:true,owner:'drag-owner',rev:11,stale:false,chatWidth:91};
  const client={
   closed:false,
   async evaluate(expression){
@@ -579,13 +579,14 @@ test('installTheme REV 10 eliminates black fades, slims scrollbars, optimizes 4K
   });
   const baseCss=headEl.children.find(c=>c.id==='agy-dream-style-v2')?.textContent||'';
   const tokenCss=headEl.children.find(c=>c.id==='agy-dream-tokens-v2')?.textContent||'';
-  assert.equal(global.window.__agyDreamSkinV2.rev,10);
+  assert.equal(global.window.__agyDreamSkinV2.rev,11);
   assert.equal(narrowScrollbar.hasAttribute('data-agy-dream-chrome'),false);
   assert.equal(rootEl.getAttribute('data-agy-chat-width'),'custom');
   assert.match(baseCss,/\[data-testid="overlay-scrollbar-thumb"\][\s\S]*width:\s*3px\s*!important/);
   assert.match(baseCss,/::-webkit-scrollbar\s*\{[\s\S]*width:\s*4px\s*!important/);
   assert.match(baseCss,/\.md-sticky-message-bleed::before/);
-  assert.match(baseCss,/\.agy-dream-width-handle/);
+  assert.match(baseCss,/from-sidebar/);
+  assert.match(baseCss,/\.agy-dream-width-handle\[data-mode="rail"\]/);
   assert.match(tokenCss,/--agy-chat-width:\s*clamp\(480px,\s*88%/);
   assert.match(tokenCss,/--max-conversation-width:\s*var\(--agy-chat-width\)\s*!important/);
   assert.match(tokenCss,/--lg-filter-content:\s*blur\(10px\);/);
@@ -609,4 +610,35 @@ test('installTheme REV 10 eliminates black fades, slims scrollbars, optimizes 4K
  }finally{
   Object.assign(global,origGlobals);
  }
+});
+
+test('HostController upgrades legacy rev 9 plugin owner while still leaving unrelated live owners untouched',async()=>{
+ const applied=[];
+ let destroys=0;
+ let state={ready:'complete',themed:true,owner:'antigravity-star-suite-plugin',rev:9,stale:false};
+ const client={
+  closed:false,
+  async evaluate(expression){
+   if(expression.startsWith('({ready:'))return {...state};
+   if(expression.startsWith('(async function installTheme')){
+    const payload=JSON.parse(expression.slice(expression.lastIndexOf(')({')+2,-1));
+    applied.push(payload);
+    state={themed:true,owner:payload.owner,rev:11};
+    return {applied:true};
+   }
+   if(expression.includes('destroy()')){destroys++;state={themed:false};return null;}
+   return true;
+  },
+  close(){this.closed=true;}
+ };
+ const hc=new HostController(
+  {payload:cfg=>({...cfg,image:'data:image/png;base64,AA=='})},
+  ()=>{},
+  {owner:'antigravity-star-suite-999-abc',discover:async()=>({target:{webSocketDebuggerUrl:'ws://127.0.0.1:1/test'}}),createClient:()=>client}
+ );
+ await hc.update({enabled:true,fit:'contain',scrim:12});
+ assert.equal(destroys,1);
+ assert.equal(applied.length,1);
+ assert.equal(applied[0].owner,'antigravity-star-suite-999-abc');
+ await hc.stop();
 });
