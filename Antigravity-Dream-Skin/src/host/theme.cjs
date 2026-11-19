@@ -1,7 +1,7 @@
 // Serialized into the host by its existing local CDP endpoint. No app files are modified.
 async function installTheme(config) {
   const key = "__agyDreamSkinV2";
-  const THEME_REV = 15;
+  const THEME_REV = 16;
   if (window[key]) {
     if (window[key].owner && window[key].owner !== config.owner) {
       const dead = typeof window[key].lastSeen === "number" && Date.now() - window[key].lastSeen > 15000;
@@ -344,6 +344,19 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
   style.id = "agy-dream-style-v2";
   style.textContent = `
  html.agy-dream-active-v2 body { background: var(--agy-dream-base-bg) !important; }
+ html.agy-dream-active-v2 body[data-has-browser-hole="true"],
+ html.agy-dream-active-v2 body[data-has-drawer-browser-hole="true"] {
+   background: transparent !important;
+   background-color: transparent !important;
+ }
+ html.agy-dream-active-v2 :is([data-browser-hole]:not([data-browser-hole="false"]), [data-wcv-proxy="true"]) {
+   background: transparent !important;
+   background-color: transparent !important;
+   background-image: none !important;
+   -webkit-backdrop-filter: none !important;
+   backdrop-filter: none !important;
+   box-shadow: none !important;
+ }
  html.agy-dream-active-v2 [data-agy-dream-root] { position: relative; z-index: 1; }
  html.agy-dream-active-v2 [data-agy-dream-clear] { background-color: transparent !important; background-image: none !important; }
  html.agy-dream-active-v2 [data-agy-dream-protect] { background-color: var(--agy-dream-old-bg) !important; backdrop-filter: none !important; }
@@ -452,7 +465,6 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
  /* 会话流与输入框宽度适配 + 概览面板避让 + 全高边缘渐隐拖动导轨 */
  html.agy-dream-active-v2 [data-testid="conversation-view"] {
    padding-right: var(--agy-overview-dodge, 0px) !important;
-   transition: padding-right 180ms ease !important;
  }
  html.agy-dream-active-v2[data-agy-chat-width="custom"] [data-testid="conversation-view"] [style*="--max-conversation-width"] {
    max-width: var(--agy-chat-width) !important;
@@ -714,7 +726,6 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
  }
  html.agy-dream-active-v2 [data-agy-dream-reading] { background: transparent !important; border: 0; box-shadow: none; }
  html.agy-dream-active-v2 .md-sticky-message-bleed { box-shadow: none !important; background-color: transparent !important; background-image: none !important; }
- html.agy-dream-active-v2 .agy-sheet :has(>.md-sticky-message-bleed) { position: relative !important; top: auto !important; }
  html.agy-dream-active-v2 :is([data-agy-dream-reading], .md-sticky-message-bleed)::after,
  html.agy-dream-active-v2 :is([data-agy-dream-reading], .md-sticky-message-bleed)::before { background: none !important; box-shadow: none !important; }
 
@@ -736,12 +747,10 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
    padding: 12px 16px;
  }
 
- /* 展开的运行命令卡片（terminal-card）：统一上下半区半透明深色玻璃样式，解除外层 300px mask 截断 */
+ /* 展开的运行命令卡片（terminal-card）：统一上下半区半透明深色玻璃样式，绝不改父级折叠容器 max-height/overflow 避免滚动锚点循环抽搐 */
  html.agy-dream-active-v2 div[style*="mask-image"]:has([class*="terminal-card"]) {
    -webkit-mask-image: none !important;
    mask-image: none !important;
-   max-height: none !important;
-   overflow: visible !important;
  }
  html.agy-dream-active-v2 [class*="terminal-card"] {
    background-color: color-mix(in srgb, var(--lg-pop-surface) 78%, rgba(12, 12, 20, 0.72)) !important;
@@ -754,8 +763,6 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
  html.agy-dream-active-v2 [class*="terminal-card"] > div:first-child {
    background-color: rgba(255, 255, 255, 0.035) !important;
    border-bottom: 1px solid var(--lg-rim-line) !important;
-   max-height: 220px !important;
-   overflow-y: auto !important;
  }
  html.agy-dream-active-v2 [class*="terminal-card"] pre,
  html.agy-dream-active-v2 [class*="terminal-card"] pre[data-agy-dream-protect],
@@ -1067,10 +1074,74 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
 
   let timer;
   let observer;
+  let bodyObserver;
+  let holeSyncTimer = null;
+  let lastHoleClip = "";
   let resize;
   let geometryTarget = null;
   let rafId = 0;
   let lastScanAt = 0;
+
+  function syncBrowserHoles() {
+    if (!active) return;
+    const hasHole =
+      document.body.getAttribute?.("data-has-browser-hole") === "true" ||
+      document.body.getAttribute?.("data-has-drawer-browser-hole") === "true";
+    if (!hasHole) {
+      if (holeSyncTimer) {
+        clearInterval(holeSyncTimer);
+        holeSyncTimer = null;
+      }
+      if (lastHoleClip) {
+        lastHoleClip = "";
+        layer.style.clipPath = "";
+        layer.style.webkitClipPath = "";
+      }
+      return;
+    }
+    if (!holeSyncTimer) {
+      holeSyncTimer = setInterval(syncBrowserHoles, 120);
+      holeSyncTimer?.unref?.();
+    }
+    const vw = Math.max(innerWidth || 0, root.getBoundingClientRect?.().width || 0);
+    const vh = Math.max(innerHeight || 0, root.getBoundingClientRect?.().height || 0);
+    const seenRects = new Set();
+    const holes = [];
+    const candidates = document.querySelectorAll?.(
+      '[data-browser-hole]:not([data-browser-hole="false"]), [data-wcv-proxy="true"], [data-testid="wcv-browser-proxy"]'
+    ) || [];
+    for (const el of candidates) {
+      const r = el.getBoundingClientRect?.();
+      if (!r || r.width < 40 || r.height < 40) continue;
+      const L = Math.max(0, Math.round(r.left));
+      const T = Math.max(0, Math.round(r.top));
+      const R = Math.min(vw, Math.round(r.right));
+      const B = Math.min(vh, Math.round(r.bottom));
+      if (R - L < 40 || B - T < 40) continue;
+      const rk = `${L},${T},${R},${B}`;
+      if (seenRects.has(rk)) continue;
+      seenRects.add(rk);
+      holes.push([L, T, R, B]);
+    }
+    if (!holes.length) {
+      if (lastHoleClip) {
+        lastHoleClip = "";
+        layer.style.clipPath = "";
+        layer.style.webkitClipPath = "";
+      }
+      return;
+    }
+    const segs = ["0px 0px", "100% 0px", "100% 100%", "0px 100%", "0px 0px"];
+    for (const [L, T, R, B] of holes) {
+      segs.push(`${L}px ${T}px`, `${L}px ${B}px`, `${R}px ${B}px`, `${R}px ${T}px`, `${L}px ${T}px`, "0px 0px");
+    }
+    const nextClip = `polygon(evenodd, ${segs.join(", ")})`;
+    if (nextClip !== lastHoleClip) {
+      lastHoleClip = nextClip;
+      layer.style.clipPath = nextClip;
+      layer.style.webkitClipPath = nextClip;
+    }
+  }
 
   function geometry() {
     const pane = [...document.querySelectorAll(".agy-sheet")].sort(
@@ -1129,6 +1200,7 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
       geometryTarget = root;
     }
     syncChatRails();
+    syncBrowserHoles();
     return { region: root, scope: pane || root, width, height };
   }
 
@@ -1145,7 +1217,10 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
     if (!convView) return;
     const vr = convView.getBoundingClientRect();
     const dodge = vr.width > 0 ? measureOverviewDodge(convView, vr) : 0;
-    convView.style?.setProperty?.("--agy-overview-dodge", dodge + "px");
+    const nextDodge = dodge + "px";
+    if (convView.style?.getPropertyValue?.("--agy-overview-dodge") !== nextDodge) {
+      convView.style?.setProperty?.("--agy-overview-dodge", nextDodge);
+    }
     const col = convView.querySelector?.(".mx-auto.w-full") || convView.querySelector?.(".surface-composer");
     if (!col) return;
     const cr = col.getBoundingClientRect();
@@ -1154,8 +1229,10 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
     const relRight = Math.min(Math.round(vr.width - dodge - 14), Math.round(cr.right - vr.left));
     const leftRail = convView.querySelector?.('.agy-dream-width-handle[data-side="left"]');
     const rightRail = convView.querySelector?.('.agy-dream-width-handle[data-side="right"]');
-    if (leftRail) leftRail.style.left = Math.max(0, relLeft - 14) + "px";
-    if (rightRail) rightRail.style.left = relRight + "px";
+    const nextL = Math.max(0, relLeft - 14) + "px";
+    const nextR = relRight + "px";
+    if (leftRail && leftRail.style.left !== nextL) leftRail.style.left = nextL;
+    if (rightRail && rightRail.style.left !== nextR) rightRail.style.left = nextR;
   }
 
   function applyCommittedChatWidth(pct) {
@@ -1354,7 +1431,7 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
         el === layer ||
         el === style ||
         el === tokenStyle ||
-        el.closest("#agy-dream-wallpaper-v2,[data-mention-menu],.typeahead-popover,.agy-overlay,[role=listbox],[role=menu],[role=dialog],[role=scrollbar],[data-overlay-scrollbar-track],[data-overlay-scrollbar-thumb],[data-testid*='scrollbar'],[data-split-sash],[data-testid=sidecar-iframe-slot],[data-testid=sidecar-iframe],.agy-dream-width-handle,[class*='terminal-card']")
+        el.closest("#agy-dream-wallpaper-v2,[data-mention-menu],.typeahead-popover,.agy-overlay,[role=listbox],[role=menu],[role=dialog],[role=scrollbar],[data-overlay-scrollbar-track],[data-overlay-scrollbar-thumb],[data-testid*='scrollbar'],[data-split-sash],[data-testid=sidecar-iframe-slot],[data-testid=sidecar-iframe],.agy-dream-width-handle,[class*='terminal-card'],[data-browser-hole]:not([data-browser-hole='false']),[data-wcv-proxy='true']")
       ) {
         continue;
       }
@@ -1429,8 +1506,9 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
     root.setAttribute("data-agy-output-mode", config.outputMode === "glass" ? "glass" : "transparent");
     root.setAttribute("data-agy-theme-style", isStarNeko ? "star-neko" : "official");
     root.setAttribute("data-agy-chat-width", effChat >= 45 ? "custom" : "default");
-    document.body.style.setProperty("--agy-dream-base-bg", isStarNeko ? (dark ? "#211e2d" : "#f3edfc") : dark ? "#070709" : "#f4f5f8");
-    layer.style.opacity = String(config.opacity ?? 0.55);
+    const baseBgColor = isStarNeko ? (dark ? "#211e2d" : "#f3edfc") : dark ? "#070709" : "#f4f5f8";
+    document.body.style.setProperty("--agy-dream-base-bg", baseBgColor);
+    layer.style.opacity = "1";
     layer.style.backgroundColor =
       config.fit === "adaptive"
         ? isStarNeko
@@ -1440,7 +1518,7 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
           : dark
             ? "#0c0d12"
             : "#edeff6"
-        : "transparent";
+        : baseBgColor;
 
     const veilPct = Number(config.glass?.veil || 0);
     const scrimAlpha = veilPct > 0 ? Math.min(0.95, veilPct / 100) : Math.max(0, Math.min(0.6, config.scrim ?? 0.12));
@@ -1452,12 +1530,17 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
     const nextSrc = config.mediaUrl || config.image || "";
     const nextKind = config.mediaKind === "video" ? "video" : "image";
     if (nextSrc) ensureMedia(nextKind, nextSrc, config);
+    if (mediaEl) mediaEl.style.opacity = String(config.opacity ?? 0.55);
     scan();
   }
 
   function destroy() {
     active = false;
     clearTimeout(timer);
+    if (holeSyncTimer) {
+      clearInterval(holeSyncTimer);
+      holeSyncTimer = null;
+    }
     if (rafId && typeof cancelAnimationFrame === "function") {
       cancelAnimationFrame(rafId);
       rafId = 0;
@@ -1468,6 +1551,7 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
       document.removeEventListener("visibilitychange", onVisibilityChange);
     }
     observer?.disconnect();
+    bodyObserver?.disconnect();
     resize?.disconnect();
     for (const h of root.querySelectorAll(".agy-dream-width-handle")) h.remove();
     document.getElementById?.("agy-dream-width-badge")?.remove();
@@ -1496,6 +1580,11 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
   update(config);
   observer = new MutationObserver(schedule);
   observer.observe(root, { childList: true, subtree: true });
+  bodyObserver = new MutationObserver(() => syncBrowserHoles());
+  bodyObserver.observe(document.body, {
+    attributes: true,
+    attributeFilter: ["data-has-browser-hole", "data-has-drawer-browser-hole"],
+  });
   resize = new ResizeObserver(schedule);
   resize.observe(root);
 
