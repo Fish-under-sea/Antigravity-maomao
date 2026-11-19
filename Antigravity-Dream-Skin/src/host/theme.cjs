@@ -1,7 +1,7 @@
 // Serialized into the host by its existing local CDP endpoint. No app files are modified.
 async function installTheme(config) {
   const key = "__agyDreamSkinV2";
-  const THEME_REV = 18;
+  const THEME_REV = 19;
   if (window[key]) {
     if (window[key].owner && window[key].owner !== config.owner) {
       const dead = typeof window[key].lastSeen === "number" && Date.now() - window[key].lastSeen > 15000;
@@ -465,6 +465,17 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
  /* 会话流与输入框宽度适配 + 概览面板避让 + 全高边缘渐隐拖动导轨 */
  html.agy-dream-active-v2 [data-testid="conversation-view"] {
    padding-right: var(--agy-overview-dodge, 0px) !important;
+ }
+ html.agy-dream-active-v2 [data-testid="conversation-view"] :is([data-testid="user-message"], [data-testid="agent-response"]) {
+   contain: layout style !important;
+ }
+ html.agy-dream-active-v2[data-agy-smooth-video="1"] [data-testid="overview-panel-host-gutter"],
+ html.agy-dream-active-v2.agy-dream-animating-split :is([data-testid="overview-panel-host-gutter"], [data-agy-dream-chrome], .surface-composer-card) {
+   -webkit-backdrop-filter: none !important;
+   backdrop-filter: none !important;
+ }
+ html.agy-dream-active-v2[data-agy-smooth-video="1"] [data-testid="overview-panel-host-gutter"] {
+   background-color: color-mix(in srgb, var(--lg-surface) max(var(--agy-glass-content-fill, 60%), 78%), transparent) !important;
  }
  html.agy-dream-active-v2[data-agy-chat-width="custom"] [data-testid="conversation-view"] [style*="--max-conversation-width"] {
    max-width: var(--agy-chat-width) !important;
@@ -1085,10 +1096,65 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
   let bodyObserver;
   let holeSyncTimer = null;
   let lastHoleClip = "";
+  let splitAnimTimer = 0;
+  let isAnimatingSplit = false;
   let resize;
   let geometryTarget = null;
   let rafId = 0;
   let lastScanAt = 0;
+
+  function beginSplitAnimation() {
+    if (!active) return;
+    if (!isAnimatingSplit) {
+      isAnimatingSplit = true;
+      // Freeze conversation column to fixed pixel width during 500ms sidebar slide so text never reflows 30x/sec
+      const convView = root.querySelector?.('[data-testid="conversation-view"]');
+      const col = convView?.querySelector?.(".mx-auto.w-full") || convView?.querySelector?.(".surface-composer");
+      if (col && root.getAttribute("data-agy-chat-width") === "custom") {
+        const w = Math.round(col.getBoundingClientRect().width);
+        if (w >= 480) {
+          document.documentElement.style.setProperty("--agy-chat-width", w + "px");
+          document.documentElement.style.setProperty("--max-conversation-width", w + "px", "important");
+        }
+      }
+      document.documentElement.classList.add("agy-dream-animating-split");
+    }
+    clearTimeout(splitAnimTimer);
+    splitAnimTimer = setTimeout(endSplitAnimation, 540);
+  }
+
+  function endSplitAnimation() {
+    clearTimeout(splitAnimTimer);
+    splitAnimTimer = 0;
+    if (!isAnimatingSplit) return;
+    isAnimatingSplit = false;
+    document.documentElement.classList.remove("agy-dream-animating-split");
+    document.documentElement.style.removeProperty("--agy-chat-width");
+    document.documentElement.style.removeProperty("--max-conversation-width");
+    if (active) {
+      syncChatRails();
+      schedule();
+    }
+  }
+
+  function onSplitTransitionStart(ev) {
+    if (ev.propertyName !== "width") return;
+    const t = ev.target;
+    if (!t || !t.closest?.('[data-testid="sidebar-split"], [data-testid="aux-pane-split"]')) return;
+    beginSplitAnimation();
+  }
+
+  function onSplitTransitionEnd(ev) {
+    if (ev.propertyName !== "width" || !isAnimatingSplit) return;
+    const t = ev.target;
+    if (!t || !t.closest?.('[data-testid="sidebar-split"], [data-testid="aux-pane-split"]')) return;
+    endSplitAnimation();
+  }
+
+  if (typeof document.addEventListener === "function") {
+    document.addEventListener("transitionstart", onSplitTransitionStart, true);
+    document.addEventListener("transitionend", onSplitTransitionEnd, true);
+  }
 
   function syncBrowserHoles() {
     if (!active) return;
@@ -1380,7 +1446,7 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
   }
 
   function scan() {
-    if (!active) return;
+    if (!active || isAnimatingSplit) return;
     lastScanAt = Date.now();
     for (let i = saved.length - 1; i >= 0; i--) {
       if (!saved[i][0].isConnected) {
@@ -1484,6 +1550,7 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
   }
 
   function schedule() {
+    if (isAnimatingSplit) return;
     clearTimeout(timer);
     const delay = Date.now() - lastScanAt < 180 ? 180 : 32;
     timer = setTimeout(() => {
@@ -1513,6 +1580,10 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
     root.setAttribute("data-agy-output-mode", config.outputMode === "glass" ? "glass" : "transparent");
     root.setAttribute("data-agy-theme-style", isStarNeko ? "star-neko" : "official");
     root.setAttribute("data-agy-chat-width", effChat >= 45 ? "custom" : "default");
+    document.documentElement.setAttribute(
+      "data-agy-smooth-video",
+      config.mediaKind === "video" && config.videoSmoothMode !== false ? "1" : "0"
+    );
     const baseBgColor = isStarNeko ? (dark ? "#211e2d" : "#f3edfc") : dark ? "#070709" : "#f4f5f8";
     document.body.style.setProperty("--agy-dream-base-bg", baseBgColor);
     layer.style.opacity = "1";
@@ -1544,6 +1615,11 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
   function destroy() {
     active = false;
     clearTimeout(timer);
+    clearTimeout(splitAnimTimer);
+    splitAnimTimer = 0;
+    isAnimatingSplit = false;
+    document.documentElement.classList.remove("agy-dream-animating-split");
+    document.documentElement.removeAttribute("data-agy-smooth-video");
     if (holeSyncTimer) {
       clearInterval(holeSyncTimer);
       holeSyncTimer = null;
@@ -1556,6 +1632,8 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
     dragCleanup = null;
     if (typeof document.removeEventListener === "function") {
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      document.removeEventListener("transitionstart", onSplitTransitionStart, true);
+      document.removeEventListener("transitionend", onSplitTransitionEnd, true);
     }
     observer?.disconnect();
     bodyObserver?.disconnect();
