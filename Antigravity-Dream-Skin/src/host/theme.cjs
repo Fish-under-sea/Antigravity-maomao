@@ -1,7 +1,7 @@
 // Serialized into the host by its existing local CDP endpoint. No app files are modified.
 async function installTheme(config) {
   const key = "__agyDreamSkinV2";
-  const THEME_REV = 16;
+  const THEME_REV = 17;
   if (window[key]) {
     if (window[key].owner && window[key].owner !== config.owner) {
       const dead = typeof window[key].lastSeen === "number" && Date.now() - window[key].lastSeen > 15000;
@@ -604,8 +604,14 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
  html.agy-dream-active-v2 .agy-sheet[data-sheet-inset="true"] [data-main-content-body="true"] {
    margin: 0 !important;
    border-radius: 0 !important;
+   background-color: transparent !important;
+   background-image: none !important;
    box-shadow: none !important;
    clip-path: none !important;
+ }
+ html.agy-dream-active-v2 body[data-has-browser-hole="true"] :is(.browser-hole-opaque, [data-pane-id], [data-tiling-pane], .browser-hole-ancestor > div):not(.monaco-editor, .monaco-editor *, .xterm, .xterm *, pre, pre *, code, code *, [role=dialog], [role=dialog] *, [role=menu], [role=menu] *, [data-mention-menu], [data-mention-menu] *, [data-popover-popup], [data-popover-popup] *, .agy-card, .surface-composer, .surface-composer-card) {
+   background-color: transparent !important;
+   background-image: none !important;
  }
  html.agy-dream-active-v2 .agy-sheet[data-sheet-inset="true"] [data-main-content-header] {
    padding-right: 14px !important;
