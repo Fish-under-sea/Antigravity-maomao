@@ -33,7 +33,7 @@ function fixture(){
     const payload=JSON.parse(expression.slice(expression.lastIndexOf(")({")+2,-1));
     applied.push(payload);
     if(blockApply){const gate=blockApply;blockApply=null;await gate;}
-    state={themed:true,owner:payload.owner,rev:14};
+    state={themed:true,owner:payload.owner,rev:15};
     return {applied:true};
    }
    if(expression.includes("touch?.()")){
@@ -488,7 +488,7 @@ test('DreamSkinSettings sanitizes videoSmoothMode and chatWidth, and HostControl
 
  let patched=null;
  let applyCount=0;
- let state={ready:'complete',themed:true,owner:'drag-owner',rev:14,stale:false,chatWidth:91};
+ let state={ready:'complete',themed:true,owner:'drag-owner',rev:15,stale:false,chatWidth:91};
  const client={
   closed:false,
   async evaluate(expression){
@@ -580,7 +580,8 @@ test('installTheme REV 10 eliminates black fades, slims scrollbars, optimizes 4K
   });
   const baseCss=headEl.children.find(c=>c.id==='agy-dream-style-v2')?.textContent||'';
   const tokenCss=headEl.children.find(c=>c.id==='agy-dream-tokens-v2')?.textContent||'';
-  assert.equal(global.window.__agyDreamSkinV2.rev,14);
+  assert.equal(global.window.__agyDreamSkinV2.rev,15);
+  assert.match(baseCss,/\.md-table-bleed\s+\.md-table-host/);
   assert.equal(narrowScrollbar.hasAttribute('data-agy-dream-chrome'),false);
   assert.equal(rootEl.getAttribute('data-agy-chat-width'),'custom');
   assert.equal(overlayCalls.length,1);
@@ -634,7 +635,7 @@ test('HostController upgrades legacy rev 9 plugin owner while still leaving unre
    if(expression.startsWith('(async function installTheme')){
     const payload=JSON.parse(expression.slice(expression.lastIndexOf(')({')+2,-1));
     applied.push(payload);
-    state={themed:true,owner:payload.owner,rev:14};
+    state={themed:true,owner:payload.owner,rev:15};
     return {applied:true};
    }
    if(expression.includes('destroy()')){destroys++;state={themed:false};return null;}

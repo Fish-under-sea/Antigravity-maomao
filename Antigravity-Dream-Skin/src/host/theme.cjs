@@ -1,7 +1,7 @@
 // Serialized into the host by its existing local CDP endpoint. No app files are modified.
 async function installTheme(config) {
   const key = "__agyDreamSkinV2";
-  const THEME_REV = 14;
+  const THEME_REV = 15;
   if (window[key]) {
     if (window[key].owner && window[key].owner !== config.owner) {
       const dead = typeof window[key].lastSeen === "number" && Date.now() - window[key].lastSeen > 15000;
@@ -456,6 +456,42 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
  }
  html.agy-dream-active-v2[data-agy-chat-width="custom"] [data-testid="conversation-view"] [style*="--max-conversation-width"] {
    max-width: var(--agy-chat-width) !important;
+ }
+ /* 锁定 Markdown 表格、数学公式、代码块、图片与卡片严格约束在会话栏宽度内，彻底禁止 100cqw 横向超限溢出 */
+ html.agy-dream-active-v2 .md-table-bleed .md-table-host,
+ html.agy-dream-active-v2 .md-table-bleed .md-table-host[data-width-mode],
+ html.agy-dream-active-v2 .md-table-bleed .md-table-host[data-width-mode="column"],
+ html.agy-dream-active-v2 .md-table-bleed .md-table-host[data-width-mode="full"] {
+   width: 100% !important;
+   min-width: 0 !important;
+   max-width: 100% !important;
+   margin-inline: 0 !important;
+   margin-inline-start: 0 !important;
+   margin-inline-end: 0 !important;
+   transform: none !important;
+   box-sizing: border-box !important;
+ }
+ html.agy-dream-active-v2 .md-table-frame,
+ html.agy-dream-active-v2 .md-table-scroll {
+   max-width: 100% !important;
+   overflow-x: auto !important;
+   border-radius: var(--agy-radius-inner, 11px) !important;
+   box-sizing: border-box !important;
+ }
+ html.agy-dream-active-v2 .md-table-scroll::-webkit-scrollbar {
+   height: 4px !important;
+ }
+ html.agy-dream-active-v2 [data-testid="conversation-view"] :is(.md-math-display, .katex-display, pre, .markdown-alert, blockquote, [class*="terminal-card"], .agy-card, .artifact-card) {
+   max-width: 100% !important;
+   min-width: 0 !important;
+   box-sizing: border-box !important;
+ }
+ html.agy-dream-active-v2 [data-testid="conversation-view"] :is(.md-math-display, .katex-display) {
+   overflow-x: auto !important;
+   overflow-y: hidden !important;
+ }
+ html.agy-dream-active-v2 [data-testid="conversation-view"] :is([data-markdown-root], .prose, .markdown-body) :is(img, video, canvas, svg.mermaid) {
+   max-width: 100% !important;
  }
  html.agy-dream-active-v2 .agy-dream-width-handle {
    position: absolute;
