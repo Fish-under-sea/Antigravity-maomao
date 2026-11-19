@@ -399,6 +399,7 @@ function buildRouteHandlers(service) {
       { path: "/", contentType: "text/html; charset=utf-8", read: () => readWebAsset("index.html") },
       { path: "/styles.css", contentType: "text/css; charset=utf-8", read: () => readWebAsset("styles.css") },
       { path: "/app.js", contentType: "application/javascript; charset=utf-8", read: () => readWebAsset("app.js") },
+      { path: "/logo.png", contentType: "image/png", read: () => fs.readFileSync(path.join(WEB_DIR, "logo.png")) },
       { path: "/preset-wallpaper.png", contentType: "image/png", read: () => service.readPresetPngBuffer() },
     ],
     apis: [

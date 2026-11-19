@@ -1,7 +1,7 @@
 // Serialized into the host by its existing local CDP endpoint. No app files are modified.
 async function installTheme(config) {
   const key = "__agyDreamSkinV2";
-  const THEME_REV = 13;
+  const THEME_REV = 14;
   if (window[key]) {
     if (window[key].owner && window[key].owner !== config.owner) {
       const dead = typeof window[key].lastSeen === "number" && Date.now() - window[key].lastSeen > 15000;
@@ -286,6 +286,8 @@ async function installTheme(config) {
   --sidebar-accent: var(--lg-sel-top) !important;
   --sidebar-border: var(--lg-rim-line) !important;
   --secondary: var(--lg-control-bg) !important;
+  --muted: var(--lg-control-bg) !important;
+  --popover: color-mix(in srgb, var(--lg-pop-surface) max(var(--agy-glass-overlay-fill), 82%), var(--lg-overlay-wash)) !important;
   --border: var(--lg-rim-line) !important;
   --card: color-mix(in srgb, var(--lg-surface) var(--agy-glass-content-fill), transparent) !important;
   --shell: color-mix(in srgb, var(--lg-surface) var(--agy-glass-header-fill), transparent) !important;${chatWidthRules}
@@ -669,15 +671,18 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
    border-radius: var(--agy-radius-inner, 11px) !important;
  }
 
- /* 页面阅读面与卡片区域：同心圆角 + 清透渐变 + 高光内框 */
+ /* 页面阅读面与卡片区域：同心圆角 + 清透渐变 + 高光内框（聊天流内气泡免除逐气泡 GPU 实时模糊重采样，彻底解决切会话与滚动卡顿） */
+ html.agy-dream-active-v2 [data-testid="conversation-view"],
+ html.agy-dream-active-v2 [data-testid="conversation-view"] > div {
+   background-color: transparent !important;
+ }
  html.agy-dream-active-v2 [data-agy-dream-reading] { background: transparent !important; border: 0; box-shadow: none; }
  html.agy-dream-active-v2 .md-sticky-message-bleed { box-shadow: none !important; background-color: transparent !important; background-image: none !important; }
  html.agy-dream-active-v2 .agy-sheet :has(>.md-sticky-message-bleed) { position: relative !important; top: auto !important; }
  html.agy-dream-active-v2 :is([data-agy-dream-reading], .md-sticky-message-bleed)::after,
  html.agy-dream-active-v2 :is([data-agy-dream-reading], .md-sticky-message-bleed)::before { background: none !important; box-shadow: none !important; }
 
- html.agy-dream-active-v2 :is(.agy-card, .artifact-card, .agy-user-bubble, .agy-takeover-card, [data-agy-dream-chrome]),
- html.agy-dream-active-v2 [data-agy-output-mode="glass"] [data-agy-dream-segment] {
+ html.agy-dream-active-v2 [data-agy-dream-chrome] {
    background-color: color-mix(in srgb, var(--lg-surface) var(--agy-glass-content-fill, 60%), transparent) !important;
    -webkit-backdrop-filter: var(--lg-filter-content, blur(22px) saturate(165%)) !important;
    backdrop-filter: var(--lg-filter-content, blur(22px) saturate(165%)) !important;
@@ -686,7 +691,49 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
  }
  html.agy-dream-active-v2 :is(.agy-card, .artifact-card, .agy-user-bubble, .agy-takeover-card),
  html.agy-dream-active-v2 [data-agy-output-mode="glass"] [data-agy-dream-segment] {
+   background-color: color-mix(in srgb, var(--lg-surface) var(--agy-glass-content-fill, 60%), transparent) !important;
+   background-image: linear-gradient(175deg, rgba(255, 255, 255, .045) 0%, transparent 72%) !important;
+   -webkit-backdrop-filter: none !important;
+   backdrop-filter: none !important;
+   border-radius: var(--agy-radius-card, 16px) !important;
+   box-shadow: inset 0 1px 0 var(--lg-rim-inset-top), inset 0 -1px 0 var(--lg-rim-shade), inset 0 0 0 1px var(--lg-rim-line);
    padding: 12px 16px;
+ }
+
+ /* 展开的运行命令卡片（terminal-card）：统一上下半区半透明深色玻璃样式，解除外层 300px mask 截断 */
+ html.agy-dream-active-v2 div[style*="mask-image"]:has([class*="terminal-card"]) {
+   -webkit-mask-image: none !important;
+   mask-image: none !important;
+   max-height: none !important;
+   overflow: visible !important;
+ }
+ html.agy-dream-active-v2 [class*="terminal-card"] {
+   background-color: color-mix(in srgb, var(--lg-pop-surface) 78%, rgba(12, 12, 20, 0.72)) !important;
+   background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 100%) !important;
+   border: 1px solid var(--lg-rim-line) !important;
+   border-radius: var(--agy-radius-inner, 11px) !important;
+   box-shadow: inset 0 1px 0 var(--lg-rim-inset-top), 0 6px 18px rgba(0, 0, 0, 0.22) !important;
+   overflow: hidden !important;
+ }
+ html.agy-dream-active-v2 [class*="terminal-card"] > div:first-child {
+   background-color: rgba(255, 255, 255, 0.035) !important;
+   border-bottom: 1px solid var(--lg-rim-line) !important;
+   max-height: 220px !important;
+   overflow-y: auto !important;
+ }
+ html.agy-dream-active-v2 [class*="terminal-card"] pre,
+ html.agy-dream-active-v2 [class*="terminal-card"] pre[data-agy-dream-protect],
+ html.agy-dream-active-v2 [class*="terminal-card"] code,
+ html.agy-dream-active-v2 [class*="terminal-card"] code[data-agy-dream-protect] {
+   background-color: transparent !important;
+   background-image: none !important;
+   border: 0 !important;
+   border-radius: 0 !important;
+   box-shadow: none !important;
+ }
+ html.agy-dream-active-v2 [class*="terminal-card"] [style*="--background"] {
+   background: transparent !important;
+   background-image: none !important;
  }
 
  /* 输入框控件区：外框保持 overflow: visible 避免裁切 [data-mention-menu]，仅内卡片裁切同心圆角 */
@@ -749,6 +796,15 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
  }
  html.agy-dream-active-v2 [data-browser-occluder="true"] :is(button, [role="menuitem"], .cursor-pointer) {
    border-radius: var(--agy-radius-badge, 6px) !important;
+ }
+ /* 设置弹窗内部：消除右侧主面板 .bg-background 纯黑遮挡，透出弹窗本体的液态磨砂玻璃与内部半透明卡片层次 */
+ html.agy-dream-active-v2 :is([role=dialog], .agy-dialog, .settings-modal-container) .bg-background:not([role=dialog]):not(.agy-dialog) {
+   background-color: transparent !important;
+   background-image: none !important;
+ }
+ html.agy-dream-active-v2 :is([role=dialog], .agy-dialog, .settings-modal-container) .agy-card {
+   background-color: color-mix(in srgb, var(--lg-surface) 48%, rgba(255, 255, 255, 0.04)) !important;
+   box-shadow: inset 0 1px 0 var(--lg-rim-inset-top), inset 0 0 0 1px var(--lg-rim-line) !important;
  }
 
  /* 斜杠清单内部列表项层次与同心圆角高对比可读性 */
@@ -1214,31 +1270,44 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
     }
     const area = geometry();
     attachResizeHandles();
+    const pendingMarks = [];
+    const pendingVars = [];
+    const queueMark = (el, attr) => pendingMarks.push([el, attr]);
+    const queueVar = (el, k, v) => pendingVars.push([el, k, v]);
+
     for (const fade of root.querySelectorAll(".absolute.bottom-0.pointer-events-none, [class*='pointer-events-none'][style*='linear-gradient']")) {
+      if (checked.has(fade)) continue;
+      checked.add(fade);
       const rect = fade.getBoundingClientRect();
       if (
         rect.height <= 96 &&
         rect.width > 100 &&
         getComputedStyle(fade).backgroundImage.includes("linear-gradient")
       ) {
-        mark(fade, "data-agy-dream-fade");
+        queueMark(fade, "data-agy-dream-fade");
       }
     }
     for (let parent = area.scope; parent && root.contains(parent); parent = parent.parentElement) {
       if (!nativeBackgrounds.has(parent)) nativeBackgrounds.set(parent, getComputedStyle(parent).backgroundColor);
-      mark(parent, "data-agy-dream-clear");
+      queueMark(parent, "data-agy-dream-clear");
       if (parent === root) break;
     }
+    const wantSegments = config.outputMode === "glass";
     for (const article of area.scope.querySelectorAll(".scroll-mt-4,[role=article],.prose,.markdown-body")) {
       const plate = article.closest(".scroll-mt-4") || article;
-      mark(plate, "data-agy-dream-reading");
-      seen.add(plate);
-      for (const segment of article.querySelectorAll("p,h1,h2,h3,h4,h5,h6,ul,ol,blockquote,table")) {
-        if (!segment.parentElement.closest("ul,ol,blockquote,table,pre,.monaco-editor,.cm-editor,.xterm,form")) {
-          mark(segment, "data-agy-dream-segment");
+      if (!seen.has(plate)) {
+        queueMark(plate, "data-agy-dream-reading");
+        seen.add(plate);
+      }
+      if (wantSegments) {
+        for (const segment of article.querySelectorAll("p,h1,h2,h3,h4,h5,h6,ul,ol,blockquote,table")) {
+          if (!segment.parentElement.closest("ul,ol,blockquote,table,pre,.monaco-editor,.cm-editor,.xterm,form")) {
+            queueMark(segment, "data-agy-dream-segment");
+          }
         }
       }
     }
+    const convView = root.querySelector?.('[data-testid="conversation-view"]');
     for (const el of root.querySelectorAll(
       "div,main,section,aside,nav,header,form,textarea,pre,code,[contenteditable=true]"
     )) {
@@ -1249,8 +1318,13 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
         el === layer ||
         el === style ||
         el === tokenStyle ||
-        el.closest("#agy-dream-wallpaper-v2,[data-mention-menu],.typeahead-popover,.agy-overlay,[role=listbox],[role=menu],[role=dialog],[role=scrollbar],[data-overlay-scrollbar-track],[data-overlay-scrollbar-thumb],[data-testid*='scrollbar'],[data-split-sash],[data-testid=sidecar-iframe-slot],[data-testid=sidecar-iframe],.agy-dream-width-handle")
+        el.closest("#agy-dream-wallpaper-v2,[data-mention-menu],.typeahead-popover,.agy-overlay,[role=listbox],[role=menu],[role=dialog],[role=scrollbar],[data-overlay-scrollbar-track],[data-overlay-scrollbar-thumb],[data-testid*='scrollbar'],[data-split-sash],[data-testid=sidecar-iframe-slot],[data-testid=sidecar-iframe],.agy-dream-width-handle,[class*='terminal-card']")
       ) {
+        continue;
+      }
+      // Inside conversation-view, skip expensive layout reads on plain layout divs to keep chat switching 60fps
+      if (convView && el !== convView && convView.contains(el) && !el.matches(protect)) {
+        checked.add(el);
         continue;
       }
       const rect = el.getBoundingClientRect();
@@ -1260,8 +1334,8 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
       const bg = css.backgroundColor;
       nativeBackgrounds.set(el, bg);
       if (el.matches(protect) && !el.closest(".surface-composer,.surface-composer-card")) {
-        mark(el, "data-agy-dream-protect");
-        variable(el, "--agy-dream-old-bg", surfaceBackground(el));
+        queueMark(el, "data-agy-dream-protect");
+        queueVar(el, "--agy-dream-old-bg", surfaceBackground(el));
         seen.add(el);
         continue;
       }
@@ -1276,15 +1350,17 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
           (rect.width >= 140 && rect.width < innerWidth * 0.35 && rect.height > innerHeight * 0.55) ||
           (rect.top < 90 && rect.width > innerWidth * 0.65 && rect.height < 110))
       ) {
-        mark(el, "data-agy-dream-chrome");
+        queueMark(el, "data-agy-dream-chrome");
         seen.add(el);
         continue;
       }
       if (el.matches("div,main,section") && rect.width > innerWidth * 0.42 && rect.height > innerHeight * 0.36) {
-        mark(el, "data-agy-dream-clear");
+        queueMark(el, "data-agy-dream-clear");
         seen.add(el);
       }
     }
+    for (let i = 0; i < pendingMarks.length; i++) mark(pendingMarks[i][0], pendingMarks[i][1]);
+    for (let i = 0; i < pendingVars.length; i++) variable(pendingVars[i][0], pendingVars[i][1], pendingVars[i][2]);
   }
 
   function schedule() {

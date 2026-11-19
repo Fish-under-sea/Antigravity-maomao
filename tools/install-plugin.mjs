@@ -10,6 +10,7 @@ const PLUGIN_FILES = [
   "plugin.json",
   "README.md",
   "assets/logo.svg",
+  "assets/logo.png",
   "sidecars/star-suite/sidecar.json",
   "sidecars/star-suite/main.mjs",
   "sidecars/star-suite/runtime-loader.mjs",
@@ -18,6 +19,7 @@ const PLUGIN_FILES = [
   "sidecars/star-suite/web/index.html",
   "sidecars/star-suite/web/styles.css",
   "sidecars/star-suite/web/app.js",
+  "sidecars/star-suite/web/logo.png",
 ];
 
 const SKIN_RUNTIME_FILES = [
