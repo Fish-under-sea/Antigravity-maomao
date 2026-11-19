@@ -1,7 +1,7 @@
 // Serialized into the host by its existing local CDP endpoint. No app files are modified.
 async function installTheme(config) {
   const key = "__agyDreamSkinV2";
-  const THEME_REV = 11;
+  const THEME_REV = 12;
   if (window[key]) {
     if (window[key].owner && window[key].owner !== config.owner) {
       const dead = typeof window[key].lastSeen === "number" && Date.now() - window[key].lastSeen > 15000;
@@ -393,7 +393,11 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
  html.agy-dream-active-v2 ::-webkit-scrollbar-thumb:hover {
    background: color-mix(in srgb, var(--foreground) 44%, transparent) !important;
  }
- /* 会话流与输入框宽度适配 + 全高边缘渐隐拖动导轨（靠近显影、鼠标指针变 ew-resize） */
+ /* 会话流与输入框宽度适配 + 概览面板避让 + 全高边缘渐隐拖动导轨 */
+ html.agy-dream-active-v2 [data-testid="conversation-view"] {
+   padding-right: var(--agy-overview-dodge, 0px) !important;
+   transition: padding-right 180ms ease !important;
+ }
  html.agy-dream-active-v2[data-agy-chat-width="custom"] [data-testid="conversation-view"] [style*="--max-conversation-width"] {
    max-width: var(--agy-chat-width) !important;
  }
@@ -482,8 +486,12 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
      0 0 0 36px var(--sidebar),
      inset 0 0 0 1px var(--lg-rim-line) !important;
  }
- html.agy-dream-active-v2 [data-main-content-body="true"] {
-   border-radius: var(--agy-radius-card, 16px) !important;
+ html.agy-dream-active-v2 .agy-sheet[data-sheet-inset="true"] [data-main-content-body="true"] {
+   margin: 0 !important;
+   border-radius: 0 !important;
+ }
+ html.agy-dream-active-v2 .agy-sheet[data-sheet-inset="true"] [data-main-content-header] {
+   padding-right: 14px !important;
  }
  html.agy-dream-active-v2 [data-main-content-body="true"]::before,
  html.agy-dream-active-v2 [data-main-content-body="true"]::after,
@@ -528,18 +536,22 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
    box-shadow: inset 3px 0 #bda2f2, inset 0 0 0 1px #bda2f238 !important;
  }
 
- /* 顶栏与侧边栏保持同一视觉基底色，仅最右侧渐隐过渡至原生窗口控制按钮 */
+ /* 顶栏与侧边栏保持同一视觉基底色，置顶层级避免菜单被主面板遮盖，并移除右侧三键黑框 */
+ html.agy-dream-active-v2 :has(> [data-testid="title-menu-bar"]) {
+   position: relative !important;
+   z-index: 60 !important;
+ }
  html.agy-dream-active-v2 [data-testid="title-menu-bar"] {
+   position: relative !important;
+   z-index: 60 !important;
    background-color: var(--sidebar) !important;
-   background-image: linear-gradient(90deg, transparent max(80%, calc(100% - 170px)), rgba(0, 0, 0, 0.56) 100%) !important;
+   background-image: none !important;
    -webkit-backdrop-filter: var(--lg-filter-sidebar, blur(18px) saturate(165%)) !important;
    backdrop-filter: var(--lg-filter-sidebar, blur(18px) saturate(165%)) !important;
    border-color: var(--lg-rim-line) !important;
  }
  html.agy-dream-active-v2 [data-agy-theme-style="star-neko"] [data-testid="title-menu-bar"] {
-   background-image:
-     radial-gradient(ellipse at 0 0, #a88ee51a, transparent 42%),
-     linear-gradient(90deg, transparent max(80%, calc(100% - 170px)), rgba(0, 0, 0, 0.56) 100%) !important;
+   background-image: radial-gradient(ellipse at 0 0, #a88ee51a, transparent 42%) !important;
  }
  html.agy-dream-active-v2 :is(header, [role=tablist], .titlebar):not([data-testid="title-menu-bar"]) {
    background-color: color-mix(in srgb, var(--lg-surface) var(--agy-glass-header-fill, 84%), transparent) !important;
@@ -646,11 +658,13 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
    .typeahead-popover.mentions-menu,
    .agy-overlay,
    [data-popover-popup],
+   [data-radix-popper-content-wrapper],
    .quick-input-widget,
    .agy-fastpick,
    [role=menu],
    [role=dialog]
  ) {
+   z-index: 9999 !important;
    background-color: color-mix(in srgb, var(--lg-pop-surface) var(--agy-glass-overlay-fill, 68%), var(--lg-overlay-wash)) !important;
    background-image:
      radial-gradient(420px 110px at 14% -12px, color-mix(in srgb, var(--lg-tint, #ffffff) 22%, rgba(255, 255, 255, .12)) 0%, transparent 62%),
@@ -952,16 +966,26 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
     return { region: root, scope: pane || root, width, height };
   }
 
+  function measureOverviewDodge(convView, vr) {
+    const ov = root.querySelector?.('[data-testid="overview-panel-host-gutter"]');
+    if (!ov) return 0;
+    const ovr = ov.getBoundingClientRect();
+    if (ovr.width <= 40 || ovr.height <= 40 || ovr.left <= vr.left + 320) return 0;
+    return Math.max(0, Math.round(vr.right - ovr.left + 12));
+  }
+
   function syncChatRails() {
     const convView = root.querySelector?.('[data-testid="conversation-view"]');
     if (!convView) return;
+    const vr = convView.getBoundingClientRect();
+    const dodge = vr.width > 0 ? measureOverviewDodge(convView, vr) : 0;
+    convView.style?.setProperty?.("--agy-overview-dodge", dodge + "px");
     const col = convView.querySelector?.(".mx-auto.w-full") || convView.querySelector?.(".surface-composer");
     if (!col) return;
-    const vr = convView.getBoundingClientRect();
     const cr = col.getBoundingClientRect();
     if (vr.width <= 0 || cr.width <= 0) return;
     const relLeft = Math.max(10, Math.round(cr.left - vr.left));
-    const relRight = Math.min(Math.round(vr.width - 14), Math.round(cr.right - vr.left));
+    const relRight = Math.min(Math.round(vr.width - dodge - 14), Math.round(cr.right - vr.left));
     const leftRail = convView.querySelector?.('.agy-dream-width-handle[data-side="left"]');
     const rightRail = convView.querySelector?.('.agy-dream-width-handle[data-side="right"]');
     if (leftRail) leftRail.style.left = Math.max(0, relLeft - 14) + "px";
@@ -1078,7 +1102,9 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
       if (!convView.querySelector('.agy-dream-width-handle[data-mode="rail"]')) {
         const getMetrics = () => {
           const col = convView.querySelector(".mx-auto.w-full") || convView.querySelector(".surface-composer");
-          const paneInnerW = Math.max(480, convView.clientWidth - 36);
+          const vr = convView.getBoundingClientRect();
+          const dodge = vr.width > 0 ? measureOverviewDodge(convView, vr) : 0;
+          const paneInnerW = Math.max(480, convView.clientWidth - dodge - 36);
           const startW = col ? col.getBoundingClientRect().width : Math.min(768, paneInnerW);
           return { paneInnerW, startW };
         };
