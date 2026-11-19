@@ -1,7 +1,7 @@
 // Serialized into the host by its existing local CDP endpoint. No app files are modified.
 async function installTheme(config) {
   const key = "__agyDreamSkinV2";
-  const THEME_REV = 17;
+  const THEME_REV = 18;
   if (window[key]) {
     if (window[key].owner && window[key].owner !== config.owner) {
       const dead = typeof window[key].lastSeen === "number" && Date.now() - window[key].lastSeen > 15000;
@@ -269,7 +269,7 @@ async function installTheme(config) {
   --agy-glass-header-blur: ${hdBlur}px;
   --agy-glass-bar-fill: ${brFill}%;
   --agy-glass-bar-blur: ${brBlur}px;
-  --lg-filter-sidebar: ${makeFilter(sbBlur, 10)};
+  --lg-filter-sidebar: ${smoothVideo ? "none" : makeFilter(sbBlur, 10)};
   --lg-filter-content: ${makeFilter(ctBlur, 10)};
   --lg-filter-overlay: ${ovBlur > 0 ? makeFilter(Math.max(ovBlur, 16), 20) : "none"};
   --lg-filter-control: ${makeFilter(clBlur, 12)};
@@ -588,6 +588,8 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
    overflow: hidden !important;
    padding: 0 8px 8px 0 !important;
    box-sizing: border-box !important;
+   contain: layout paint !important;
+   transition: width 500ms var(--ease-expo-out), height 500ms var(--ease-expo-out), padding-left 500ms var(--ease-expo-out) !important;
  }
  html.agy-dream-active-v2 [data-split-root="true"]:has(> .flex:first-child[style*="width: 0"]) > [data-split-fill-edge="left"]:has(> .agy-sheet),
  html.agy-dream-active-v2 [data-split-root="true"] > [data-split-fill-edge="left"]:has(> .agy-sheet[data-sidebar-closed]) {
@@ -597,7 +599,7 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
    border-radius: var(--agy-radius-outer, 20px) !important;
    overflow: hidden !important;
    box-shadow:
-     0 0 0 36px var(--sidebar),
+     0 0 0 22px var(--sidebar),
      inset 0 0 0 1px var(--lg-rim-line) !important;
  }
  html.agy-dream-active-v2 .agy-sheet[data-sheet-inset] :is([data-main-content-body], [data-side-panel-body]),
@@ -1427,10 +1429,9 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
       }
     }
     const convView = root.querySelector?.('[data-testid="conversation-view"]');
-    for (const el of root.querySelectorAll(
+    for (const el of area.scope.querySelectorAll(
       "div,main,section,aside,nav,header,form,textarea,pre,code,[contenteditable=true]"
     )) {
-      if (!area.scope.contains(el)) continue;
       if (
         seen.has(el) ||
         checked.has(el) ||
