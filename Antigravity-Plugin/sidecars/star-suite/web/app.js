@@ -49,6 +49,8 @@
 
   const el = {
     errorBanner: $("errorBanner"),
+    cdpWarnBanner: $("cdpWarnBanner"),
+    btnRelaunchHost: $("btnRelaunchHost"),
     hostDot: $("hostDot"),
     hostStatusLabel: $("hostStatusLabel"),
     hostStatusDetail: $("hostStatusDetail"),
@@ -744,6 +746,9 @@
       el.hostStatusLabel.textContent = "未连接";
     }
     el.hostStatusDetail.textContent = host.message || "等待检测 Antigravity";
+    if (el.cdpWarnBanner) {
+      el.cdpWarnBanner.classList.toggle("hidden", Boolean(host.connected));
+    }
 
     for (const btn of el.outputModeBtns) {
       btn.classList.toggle("active", btn.dataset.outputMode === s.outputMode);
@@ -823,6 +828,26 @@
       setError(error.message);
     }
   });
+
+  if (el.btnRelaunchHost) {
+    el.btnRelaunchHost.addEventListener("click", async () => {
+      el.btnRelaunchHost.disabled = true;
+      el.btnRelaunchHost.textContent = "正在重启…";
+      try {
+        setError("");
+        const res = await requestJson("/api/relaunch-host", "POST", {});
+        if (res && res.ok === false) {
+          setError(res.error || "重启失败");
+          el.btnRelaunchHost.disabled = false;
+          el.btnRelaunchHost.textContent = "一键调试重启";
+        }
+      } catch (error) {
+        setError(error.message);
+        el.btnRelaunchHost.disabled = false;
+        el.btnRelaunchHost.textContent = "一键调试重启";
+      }
+    });
+  }
 
   el.chkSkinEnabled.addEventListener("change", () => saveSettings({ enabled: el.chkSkinEnabled.checked }));
 

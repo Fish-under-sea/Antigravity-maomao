@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
@@ -340,6 +340,41 @@ export async function createStarSuiteService(options = {}) {
     await mediaServer.stop();
   };
 
+  function relaunchHostWithDebugPort() {
+    if (process.platform !== "win32") {
+      return { ok: false, error: "当前仅支持 Windows 自动以调试模式重启 Antigravity" };
+    }
+    const candidates = [
+      process.env.ANTIGRAVITY_EXE_PATH,
+      process.execPath && /Antigravity\.exe$/i.test(process.execPath) ? process.execPath : "",
+      path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData/Local"), "Programs/antigravity/Antigravity.exe"),
+    ].filter(Boolean);
+    const exePath = candidates.find((p) => fs.existsSync(p));
+    if (!exePath) {
+      return { ok: false, error: "未找到 Antigravity.exe 安装路径，请从桌面或开始菜单快捷方式重新打开" };
+    }
+    const cleanEnv = { ...process.env };
+    delete cleanEnv.ELECTRON_RUN_AS_NODE;
+    const escaped = exePath.replace(/'/g, "''");
+    const psScript = [
+      "Start-Sleep -Milliseconds 350",
+      "$procs = Get-Process -Name 'Antigravity' -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 }",
+      "foreach ($p in $procs) { try { $p.CloseMainWindow() | Out-Null } catch {} }",
+      "$deadline = (Get-Date).AddSeconds(6)",
+      "while ((Get-Date) -lt $deadline) { if (-not (Get-Process -Name 'Antigravity' -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 })) { break }; Start-Sleep -Milliseconds 250 }",
+      "Start-Sleep -Milliseconds 300",
+      `Start-Process -FilePath '${escaped}' -ArgumentList '--remote-debugging-address=127.0.0.1','--remote-debugging-port=0'`,
+    ].join("; ");
+    const encoded = Buffer.from(psScript, "utf16le").toString("base64");
+    const child = spawn(
+      "powershell.exe",
+      ["-NoProfile", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encoded],
+      { detached: true, stdio: "ignore", env: cleanEnv, windowsHide: true }
+    );
+    child.unref();
+    return { ok: true, exePath, message: "正在以调试模式重启 Antigravity，请稍候 3 秒…" };
+  }
+
   return {
     root,
     skinRoot,
@@ -357,6 +392,7 @@ export async function createStarSuiteService(options = {}) {
     pickAndApplyMedia,
     refresh,
     handleWidgetAction,
+    relaunchHostWithDebugPort,
     readPresetPngBuffer,
     start,
     stop,
@@ -437,6 +473,11 @@ function buildRouteHandlers(service) {
         method: "POST",
         path: "/api/refresh",
         handle: async () => ({ status: 200, data: await service.refresh() }),
+      },
+      {
+        method: "POST",
+        path: "/api/relaunch-host",
+        handle: async () => ({ status: 200, data: service.relaunchHostWithDebugPort() }),
       },
       {
         method: "POST",

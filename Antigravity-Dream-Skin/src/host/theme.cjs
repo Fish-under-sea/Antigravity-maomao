@@ -1,7 +1,7 @@
 // Serialized into the host by its existing local CDP endpoint. No app files are modified.
 async function installTheme(config) {
   const key = "__agyDreamSkinV2";
-  const THEME_REV = 19;
+  const THEME_REV = 20;
   if (window[key]) {
     if (window[key].owner && window[key].owner !== config.owner) {
       const dead = typeof window[key].lastSeen === "number" && Date.now() - window[key].lastSeen > 15000;
@@ -1056,10 +1056,43 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
         clearTimeout(videoRecoverTimer);
         videoRecoverTimer = setTimeout(() => playVideoSafely(mediaEl), 700);
       };
+      let errorRetries = 0;
+      let zeroReadyBeats = 0;
       mediaEl.addEventListener("stalled", scheduleRecover);
       mediaEl.addEventListener("waiting", scheduleRecover);
+      mediaEl.addEventListener("playing", () => {
+        errorRetries = 0;
+        zeroReadyBeats = 0;
+      });
+      mediaEl.addEventListener("error", () => {
+        if (!active || currentKind !== "video" || !mediaEl || errorRetries >= 4) return;
+        errorRetries++;
+        clearTimeout(videoRecoverTimer);
+        videoRecoverTimer = setTimeout(() => {
+          if (!active || currentKind !== "video" || !mediaEl) return;
+          try {
+            mediaEl.src = src;
+            mediaEl.load();
+          } catch {}
+          playVideoSafely(mediaEl);
+        }, Math.min(4000, errorRetries * 1000));
+      });
       videoWatchdog = setInterval(() => {
         if (!active || currentKind !== "video" || !mediaEl || document.hidden || config.videoPaused) return;
+        if (mediaEl.readyState === 0) {
+          zeroReadyBeats++;
+          if (zeroReadyBeats >= 2 && errorRetries < 4) {
+            zeroReadyBeats = 0;
+            errorRetries++;
+            try {
+              mediaEl.src = src;
+              mediaEl.load();
+            } catch {}
+            playVideoSafely(mediaEl);
+          }
+          return;
+        }
+        zeroReadyBeats = 0;
         if (mediaEl.readyState < 2) return;
         if (mediaEl.paused) {
           playVideoSafely(mediaEl);

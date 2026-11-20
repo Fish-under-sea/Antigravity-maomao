@@ -40,7 +40,7 @@ class HostController {
       if (!this.client || this.client.closed) {
         const found = await this.discover();
         if (!found) {
-          this.report({ connected: false, applied: false, message: "请先打开 Antigravity，检测到后自动连接" });
+          this.report({ connected: false, applied: false, message: "未检测到宿主调试端口（如经 Cockpit Tools 切号重开，可点击一键以调试模式重启）" });
           return;
         }
         this.client = this.createClient(found.target.webSocketDebuggerUrl);
@@ -69,7 +69,7 @@ class HostController {
         !current.stale &&
         typeof current.rev === "number" &&
         current.rev > 0 &&
-        current.rev < 19 &&
+        current.rev < 20 &&
         (current.owner === "antigravity-star-suite-plugin" || String(current.owner).startsWith("antigravity-star-suite-"));
       if (current.themed && current.owner !== this.owner && !current.stale && !canUpgradeLegacy) {
         this.report({ connected: true, applied: false, message: "已连接 · 皮肤由另一个运行实例管理" });
@@ -96,7 +96,7 @@ class HostController {
         }
       }
       const signature = JSON.stringify(effectiveSettings);
-      if (!current.themed || current.stale || current.rev !== 19 || signature !== this.signature) {
+      if (!current.themed || current.stale || current.rev !== 20 || signature !== this.signature) {
         const payload = { ...this.loader.payload(effectiveSettings), owner: this.owner };
         const result = await this.client.evaluate("(" + installTheme.toString() + ")(" + JSON.stringify(payload) + ")");
         this.signature = signature;

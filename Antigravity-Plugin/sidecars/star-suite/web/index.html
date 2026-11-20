@@ -42,6 +42,15 @@
     </header>
 
     <div class="ss-banner ss-banner-error hidden" id="errorBanner" role="alert"></div>
+    <div class="ss-card ss-glass-card hidden" id="cdpWarnBanner" role="status" style="border-color: rgba(245, 158, 11, 0.45); background: rgba(245, 158, 11, 0.12);">
+      <div class="ss-row" style="gap: 10px; align-items: center;">
+        <div class="ss-who">
+          <div class="ss-name" style="color: #fbbf24;">未检测到本机调试端口</div>
+          <div class="ss-sub">若刚通过 Cockpit Tools 切号重开，Antigravity 未携带调试参数，点击右侧按钮即可一键恢复视频壁纸。</div>
+        </div>
+        <button type="button" class="ss-btn ss-btn-primary ss-btn-sm" id="btnRelaunchHost" style="flex-shrink: 0;">一键调试重启</button>
+      </div>
+    </div>
 
     <!-- 分区导航 -->
     <nav class="ss-tabs ss-glass-control" role="tablist" aria-label="功能分区">
