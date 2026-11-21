@@ -1,7 +1,7 @@
 // Serialized into the host by its existing local CDP endpoint. No app files are modified.
 async function installTheme(config) {
   const key = "__agyDreamSkinV2";
-  const THEME_REV = 20;
+  const THEME_REV = 21;
   if (window[key]) {
     if (window[key].owner && window[key].owner !== config.owner) {
       const dead = typeof window[key].lastSeen === "number" && Date.now() - window[key].lastSeen > 15000;
@@ -730,8 +730,8 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
    border-radius: var(--agy-radius-inner, 11px) !important;
  }
 
- /* 页内独立工具条：仅作用于非输入框内页内状态条，避免输入框内底栏与输入区断层 */
- html.agy-dream-active-v2 [role=status]:not(.surface-composer *) {
+ /* 页内独立工具条：仅作用于非输入框内、非右下角 Toast 通知内的页内状态条，避免输入框断层或右下角 Toast 叠层错乱 */
+ html.agy-dream-active-v2 [role=status]:not(.surface-composer *):not(.toast-viewport):not(.toast-viewport *):not(.toast-root):not(.toast-root *):not(.agy-toast) {
    background-color: color-mix(in srgb, var(--lg-surface) var(--agy-glass-bar-fill, 80%), transparent) !important;
    -webkit-backdrop-filter: var(--lg-filter-bar, blur(14px) saturate(165%)) !important;
    backdrop-filter: var(--lg-filter-bar, blur(14px) saturate(165%)) !important;
@@ -830,21 +830,30 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
    border-radius: var(--agy-radius-inner, 11px) !important;
  }
 
- /* 浮层、顶栏下拉菜单、对话框 + 斜杠清单 [data-mention-menu] 液态磨砂玻璃 + 圆角重设计 */
+ /* 仅对嵌套在低层级容器内的顶栏下拉与斜杠菜单提权置顶，绝不覆写 [role=dialog] / .toast-root 原生 z-index，避免设置弹窗遮盖内部 z-[6000] 模型下拉框或打乱右下角 Toast 堆叠顺序 */
+ html.agy-dream-active-v2 :is(
+   [data-mention-menu][role="listbox"],
+   [data-browser-occluder="true"],
+   [data-testid="title-menu-bar"] .surface-opaque,
+   .typeahead-popover.mentions-menu
+ ) {
+   z-index: 9999 !important;
+ }
+ /* 浮层、顶栏下拉菜单、选择器弹窗、对话框 + 斜杠清单 [data-mention-menu] 液态磨砂玻璃 + 圆角重设计（排除 .toast-root 保留原生堆叠） */
  html.agy-dream-active-v2 :is(
    [data-mention-menu][role="listbox"],
    [data-browser-occluder="true"],
    [data-testid="title-menu-bar"] .surface-opaque,
    .typeahead-popover.mentions-menu,
    .agy-overlay,
+   [data-select-popup],
    [data-popover-popup],
    [data-radix-popper-content-wrapper],
    .quick-input-widget,
    .agy-fastpick,
    [role=menu],
    [role=dialog]
- ) {
-   z-index: 9999 !important;
+ ):not(.toast-root):not(.toast-viewport *) {
    background-color: color-mix(in srgb, var(--lg-pop-surface) max(var(--agy-glass-overlay-fill, 68%), 82%), var(--lg-overlay-wash)) !important;
    background-image:
      radial-gradient(420px 110px at 14% -12px, color-mix(in srgb, var(--lg-tint, #ffffff) 22%, rgba(255, 255, 255, .12)) 0%, transparent 62%),
@@ -855,6 +864,18 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
    border-radius: var(--agy-radius-card, 16px) !important;
    box-shadow: inset 0 1px 0 var(--lg-rim-inset-top), inset 0 -1px 0 var(--lg-rim-shade), var(--lg-shadow-pop) !important;
    color: var(--foreground) !important;
+ }
+ /* 右下角 Toast 堆叠通知：完整保留原生 z-index: calc(1000 - var(--toast-index)) 与堆叠位移，高不透明度遮罩防止后排文字透底重叠 */
+ html.agy-dream-active-v2 :is(.agy-toast, .agy-tip-card) {
+   background-color: color-mix(in srgb, var(--lg-pop-surface) 95%, var(--lg-overlay-wash)) !important;
+   background-image: linear-gradient(175deg, rgba(255, 255, 255, .045) 0%, transparent 72%) !important;
+   border: 1px solid var(--lg-rim-line) !important;
+   border-radius: var(--agy-radius-inner, 11px) !important;
+   box-shadow: inset 0 1px 0 var(--lg-rim-inset-top), var(--lg-shadow-pop) !important;
+   color: var(--foreground) !important;
+ }
+ html.agy-dream-active-v2 .toast-root:not([data-expanded])[data-behind] > * {
+   opacity: 0.35 !important;
  }
  html.agy-dream-active-v2 [data-browser-occluder="true"] :is(button, [role="menuitem"], .cursor-pointer) {
    border-radius: var(--agy-radius-badge, 6px) !important;

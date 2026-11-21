@@ -69,7 +69,7 @@ class HostController {
         !current.stale &&
         typeof current.rev === "number" &&
         current.rev > 0 &&
-        current.rev < 20 &&
+        current.rev < 21 &&
         (current.owner === "antigravity-star-suite-plugin" || String(current.owner).startsWith("antigravity-star-suite-"));
       if (current.themed && current.owner !== this.owner && !current.stale && !canUpgradeLegacy) {
         this.report({ connected: true, applied: false, message: "已连接 · 皮肤由另一个运行实例管理" });
@@ -96,7 +96,7 @@ class HostController {
         }
       }
       const signature = JSON.stringify(effectiveSettings);
-      if (!current.themed || current.stale || current.rev !== 20 || signature !== this.signature) {
+      if (!current.themed || current.stale || current.rev !== 21 || signature !== this.signature) {
         const payload = { ...this.loader.payload(effectiveSettings), owner: this.owner };
         const result = await this.client.evaluate("(" + installTheme.toString() + ")(" + JSON.stringify(payload) + ")");
         this.signature = signature;
