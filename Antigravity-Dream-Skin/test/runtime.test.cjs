@@ -663,3 +663,45 @@ test('HostController upgrades legacy rev 9 plugin owner while still leaving unre
  assert.equal(applied[0].owner,'antigravity-star-suite-999-abc');
  await hc.stop();
 });
+
+test('HostController styles third-party plugin iframes (e.g. Swarm) with transparent glass and cleans up on disable',async()=>{
+ const frameOps=[];
+ const mainClient={
+  closed:false,
+  async evaluate(expression){
+   if(expression.startsWith('({ready:'))return {ready:'complete',themed:true,owner:'swarm-test',rev:21,stale:false};
+   if(expression.includes('touch?.()'))return true;
+   if(expression.includes('destroy()'))return {removed:true};
+   return {applied:true};
+  },
+  close(){this.closed=true;}
+ };
+ const frameClient={
+  closed:false,
+  async evaluate(expression){
+   frameOps.push(expression);
+   return {applied:true};
+  },
+  close(){this.closed=true;}
+ };
+ const hc=new HostController(
+  {payload:cfg=>({...cfg,image:'data:image/png;base64,AA=='})},
+  ()=>{},
+  {
+   owner:'swarm-test',
+   discover:async()=>({port:55555,target:{webSocketDebuggerUrl:'ws://127.0.0.1:55555/page/1'}}),
+   listTargets:async()=>[
+    {id:'f-swarm',type:'iframe',url:'plugin://swarm--swarm_board-1/?token=1',webSocketDebuggerUrl:'ws://127.0.0.1:55555/frame/swarm'},
+    {id:'f-self',type:'iframe',url:'plugin://antigravity-star-suite--star-suite-1/?token=2',webSocketDebuggerUrl:'ws://127.0.0.1:55555/frame/self'}
+   ],
+   createClient:url=>url.includes('/frame/swarm')?frameClient:mainClient
+  }
+ );
+ await hc.update({enabled:true,fit:'contain',scrim:12,glass:{themeStyle:'star-neko',radius:16,regions:{content:{fill:60}}}});
+ assert.equal(frameOps.length,1);
+ assert.match(frameOps[0],/installPluginFrameTheme/);
+ await hc.update({enabled:false});
+ assert.equal(frameOps.length,2);
+ assert.match(frameOps[1],/__agyDreamPluginFrameV2\?\.destroy/);
+ await hc.stop();
+});

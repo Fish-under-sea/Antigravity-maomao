@@ -1,8 +1,17 @@
 const fs=require("node:fs"),path=require("node:path"),os=require("node:os"),http=require("node:http"),WebSocket=require("./vendor/ws");
 function getJson(port,resource){return new Promise((resolve,reject)=>{const req=http.get({hostname:"127.0.0.1",port,path:resource,timeout:1800},res=>{let data="";res.on("data",b=>{data+=b;if(data.length>1048576)req.destroy();});res.on("end",()=>{try{resolve(JSON.parse(data));}catch{reject(new Error("宿主端点返回无效数据"));}});});req.on("timeout",()=>req.destroy(new Error("宿主响应超时")));req.on("error",reject);});}
+async function listTargets(port){
+ if(!Number.isInteger(port)||port<1||port>65535)return[];
+ try{
+  const targets=await getJson(port,"/json/list");
+  return Array.isArray(targets)?targets:[];
+ }catch{
+  return[];
+ }
+}
 async function discover(){
  const candidates=[path.join(process.env.APPDATA||path.join(os.homedir(),"AppData/Roaming"),"Antigravity/DevToolsActivePort"),path.join(os.homedir(),"Library/Application Support/Antigravity/DevToolsActivePort"),path.join(os.homedir(),".config/Antigravity/DevToolsActivePort")];
- for(const file of candidates)try{const port=Number(fs.readFileSync(file,"utf8").split("\n")[0]);if(!Number.isInteger(port)||port<1||port>65535)continue;const targets=await getJson(port,"/json/list");const target=targets.find(t=>t.type==="page"&&/^https?:\/\/127\.0\.0\.1:\d+\//.test(t.url));if(target&&/^ws:\/\/(127\.0\.0\.1|localhost):\d+\//.test(target.webSocketDebuggerUrl))return{port,target};}catch{}
+ for(const file of candidates)try{const port=Number(fs.readFileSync(file,"utf8").split("\n")[0]);if(!Number.isInteger(port)||port<1||port>65535)continue;const targets=await listTargets(port);const target=targets.find(t=>t.type==="page"&&/^https?:\/\/127\.0\.0\.1:\d+\//.test(t.url));if(target&&/^ws:\/\/(127\.0\.0\.1|localhost):\d+\//.test(target.webSocketDebuggerUrl))return{port,target};}catch{}
  return null;
 }
 class Cdp{
@@ -18,4 +27,4 @@ class Cdp{
  async evaluate(expression){const out=await this.send("Runtime.evaluate",{expression,returnByValue:true,awaitPromise:true});if(out.exceptionDetails)throw new Error(out.exceptionDetails.exception?.description||out.exceptionDetails.text||"宿主执行失败");return out.result?.value;}
  close(){this.closed=true;this.socket.close();}
 }
-module.exports={discover,Cdp};
+module.exports={discover,listTargets,Cdp};

@@ -1756,4 +1756,90 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
   return status();
 }
 
-module.exports = { installTheme };
+function installPluginFrameTheme(config) {
+  const key = "__agyDreamPluginFrameV2";
+  const FRAME_REV = 1;
+  if (window[key]) {
+    if (window[key].owner === config.owner && window[key].rev === FRAME_REV) {
+      window[key].update(config);
+      return { applied: true };
+    }
+    window[key].destroy();
+  }
+  const head = document.head || document.documentElement;
+  if (!head) return { applied: false };
+
+  const style = document.createElement("style");
+  style.id = "agy-dream-plugin-frame-v2";
+
+  function renderCss(cfg) {
+    const g = cfg?.glass || {};
+    const r = g.regions || {};
+    const radius = Math.min(24, Math.max(8, Math.round(Number(g.radius) || 16)));
+    const ctFill = Math.min(100, Math.max(0, Math.round(Number(r.content?.fill ?? 60))));
+    const starNeko = g.themeStyle !== "official";
+    const cardAlpha = Math.max(0.28, Math.min(0.82, ctFill / 100));
+    const cardBg = starNeko
+      ? `rgba(34, 29, 48, ${cardAlpha})`
+      : `rgba(24, 26, 36, ${cardAlpha})`;
+    return `
+html.agy-dream-plugin-frame-v2,
+html.agy-dream-plugin-frame-v2:root {
+  --background: transparent !important;
+  --content: transparent !important;
+  --sw-bg: transparent !important;
+  --vscode-editor-background: transparent !important;
+  --card: ${cardBg} !important;
+  --sw-card: ${cardBg} !important;
+}
+html.agy-dream-plugin-frame-v2,
+html.agy-dream-plugin-frame-v2 body,
+html.agy-dream-plugin-frame-v2 .board,
+html.agy-dream-plugin-frame-v2 .main,
+html.agy-dream-plugin-frame-v2 .tab-body,
+html.agy-dream-plugin-frame-v2 #root,
+html.agy-dream-plugin-frame-v2 #app {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+}
+html.agy-dream-plugin-frame-v2 .header {
+  background: color-mix(in srgb, rgba(255, 255, 255, 0.045) 60%, transparent) !important;
+  background-color: rgba(255, 255, 255, 0.03) !important;
+  border-bottom-color: var(--border, rgba(255, 255, 255, 0.14)) !important;
+}
+html.agy-dream-plugin-frame-v2 :is(.card, .sw-card, .pane, [class*="bg-background"]) {
+  background-color: transparent !important;
+}
+html.agy-dream-plugin-frame-v2 :is(.card, .sw-card) {
+  background-color: ${cardBg} !important;
+  border-radius: ${Math.max(8, radius - 4)}px !important;
+}
+html.agy-dream-plugin-frame-v2 ::-webkit-scrollbar {
+  width: 4px !important;
+  height: 4px !important;
+}
+html.agy-dream-plugin-frame-v2 ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.24) !important;
+  border-radius: 9999px !important;
+}`;
+  }
+
+  function update(next) {
+    style.textContent = renderCss(next);
+  }
+  function destroy() {
+    style.remove();
+    document.documentElement.classList.remove("agy-dream-plugin-frame-v2");
+    delete window[key];
+    return { removed: true };
+  }
+
+  head.appendChild(style);
+  document.documentElement.classList.add("agy-dream-plugin-frame-v2");
+  update(config);
+  window[key] = { rev: FRAME_REV, owner: config.owner, update, destroy };
+  return { applied: true };
+}
+
+module.exports = { installTheme, installPluginFrameTheme };
