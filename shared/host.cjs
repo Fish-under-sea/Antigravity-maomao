@@ -18,12 +18,13 @@ class Cdp{
  constructor(url,options={}){
   if(!/^ws:\/\/(127\.0\.0\.1|localhost):\d+\//.test(url))throw new Error("仅允许本机宿主");
   const handshakeTimeout=Number.isFinite(options.handshakeTimeout)?Math.max(20,Math.min(10000,options.handshakeTimeout)):4000;
+  this.requestTimeout=Number.isFinite(options.requestTimeout)?Math.max(100,Math.min(30000,options.requestTimeout)):7000;
   this.socket=new WebSocket(url,{maxPayload:5*1024*1024,handshakeTimeout});this.pending=new Map();this.id=0;this.closed=false;
   this.ready=new Promise((resolve,reject)=>{this.socket.once("open",resolve);this.socket.once("error",reject);});
   this.socket.on("message",raw=>{try{const m=JSON.parse(raw),p=this.pending.get(m.id);if(p){this.pending.delete(m.id);clearTimeout(p.timer);m.error?p.reject(new Error(m.error.message)):p.resolve(m.result);}}catch{}});
   this.socket.on("error",()=>{});this.socket.on("close",()=>{this.closed=true;for(const p of this.pending.values()){clearTimeout(p.timer);p.reject(new Error("宿主已断开"));}this.pending.clear();});
  }
- async send(method,params={}){await this.ready;if(this.closed)throw new Error("宿主已断开");return new Promise((resolve,reject)=>{const id=++this.id,timer=setTimeout(()=>{this.pending.delete(id);reject(new Error("宿主操作超时"));},7000);this.pending.set(id,{resolve,reject,timer});this.socket.send(JSON.stringify({id,method,params}));});}
+ async send(method,params={}){await this.ready;if(this.closed)throw new Error("宿主已断开");return new Promise((resolve,reject)=>{const id=++this.id,timer=setTimeout(()=>{this.pending.delete(id);reject(new Error("宿主操作超时"));},this.requestTimeout);this.pending.set(id,{resolve,reject,timer});this.socket.send(JSON.stringify({id,method,params}));});}
  async evaluate(expression){const out=await this.send("Runtime.evaluate",{expression,returnByValue:true,awaitPromise:true});if(out.exceptionDetails)throw new Error(out.exceptionDetails.exception?.description||out.exceptionDetails.text||"宿主执行失败");return out.result?.value;}
  close(){this.closed=true;this.socket.close();}
 }

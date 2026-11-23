@@ -8,10 +8,10 @@ class HostController {
     this.onHostPatch = typeof options.onHostPatch === "function" ? options.onHostPatch : null;
     this.discover = options.discover || discover;
     this.listTargets = options.listTargets || listTargets;
-    this.createClient = options.createClient || (url => new Cdp(url));
+    this.createClient = options.createClient || ((url, clientOptions) => new Cdp(url, clientOptions));
     this.client = null;
     this.port = null;
-    this.frameClients = new Map();
+    this.frameStates = new Map();
     this.settings = { enabled: false };
     this.status = { connected: false, applied: false, message: "等待连接 Antigravity" };
     this.signature = null;
@@ -44,7 +44,7 @@ class HostController {
         const found = await this.discover();
         if (!found) {
           this.port = null;
-          this.closeFrameClients();
+          this.frameStates.clear();
           this.report({ connected: false, applied: false, message: "未检测到宿主调试端口（如经 Cockpit Tools 切号重开，可点击一键以调试模式重启）" });
           return;
         }
@@ -53,14 +53,14 @@ class HostController {
         this.signature = null;
       }
       const current = await this.client.evaluate(
-        "({ready:document.readyState,themed:!!window.__agyDreamSkinV2?.status().applied,owner:window.__agyDreamSkinV2?.owner,rev:window.__agyDreamSkinV2?.rev||0,stale:typeof window.__agyDreamSkinV2?.lastSeen==='number'&&(Date.now()-window.__agyDreamSkinV2.lastSeen>15000),chatWidth:window.__agyDreamSkinV2?.consumeChatWidth?.()??null})"
+        "({ready:document.readyState,themed:!!window.__agyDreamSkinV2?.status().applied,mediaHealthy:window.__agyDreamSkinV2?.status()?.mediaHealthy!==false,mediaSrc:window.__agyDreamSkinV2?.status()?.mediaSrc||'',owner:window.__agyDreamSkinV2?.owner,rev:window.__agyDreamSkinV2?.rev||0,stale:typeof window.__agyDreamSkinV2?.lastSeen==='number'&&(Date.now()-window.__agyDreamSkinV2.lastSeen>15000),chatWidth:window.__agyDreamSkinV2?.consumeChatWidth?.()??null})"
       );
       if (revision !== this.revision || this.stopping) return;
       if (!settings.enabled) {
         if (current.themed && (current.owner === this.owner || current.stale)) {
           await this.client.evaluate("window.__agyDreamSkinV2?.destroy()");
         }
-        await this.syncPluginFrames(null);
+        try { await this.syncPluginFrames(null); } catch {}
         this.signature = null;
         this.report({
           connected: true, applied: false,
@@ -76,7 +76,7 @@ class HostController {
         !current.stale &&
         typeof current.rev === "number" &&
         current.rev > 0 &&
-        current.rev < 21 &&
+        current.rev < 25 &&
         (current.owner === "antigravity-star-suite-plugin" || String(current.owner).startsWith("antigravity-star-suite-"));
       if (current.themed && current.owner !== this.owner && !current.stale && !canUpgradeLegacy) {
         this.report({ connected: true, applied: false, message: "已连接 · 皮肤由另一个运行实例管理" });
@@ -103,8 +103,15 @@ class HostController {
         }
       }
       const signature = JSON.stringify(effectiveSettings);
-      if (!current.themed || current.stale || current.rev !== 21 || signature !== this.signature) {
-        const payload = { ...this.loader.payload(effectiveSettings), owner: this.owner };
+      const rawPayload = this.loader.payload(effectiveSettings);
+      const expectedMediaSrc = rawPayload.mediaUrl || rawPayload.image || "";
+      const mediaBroken =
+        current.themed &&
+        current.owner === this.owner &&
+        (current.mediaHealthy === false ||
+          (Boolean(current.mediaSrc) && Boolean(expectedMediaSrc) && current.mediaSrc !== expectedMediaSrc));
+      if (!current.themed || current.stale || current.rev !== 25 || signature !== this.signature || mediaBroken) {
+        const payload = { ...rawPayload, owner: this.owner };
         const result = await this.client.evaluate("(" + installTheme.toString() + ")(" + JSON.stringify(payload) + ")");
         this.signature = signature;
         this.report({
@@ -114,21 +121,15 @@ class HostController {
       } else if (current.owner === this.owner) {
         await this.client.evaluate("window.__agyDreamSkinV2?.touch?.()");
       }
-      await this.syncPluginFrames(effectiveSettings);
+      try { await this.syncPluginFrames(effectiveSettings); } catch {}
     } catch (error) {
       this.client?.close();
       this.client = null;
       this.port = null;
-      this.closeFrameClients();
+      this.frameStates.clear();
       this.signature = null;
       this.report({ connected: false, applied: false, message: "暂未接入：" + error.message });
     }
-  }
-  closeFrameClients() {
-    for (const entry of this.frameClients.values()) {
-      try { entry.client?.close(); } catch {}
-    }
-    this.frameClients.clear();
   }
   async syncPluginFrames(effectiveSettings) {
     if (!this.port || typeof this.listTargets !== "function") return;
@@ -148,19 +149,22 @@ class HostController {
         /^ws:\/\/(127\.0\.0\.1|localhost):\d+\//.test(t.webSocketDebuggerUrl || "")
     );
     const activeIds = new Set(pluginFrames.map((t) => t.id || t.webSocketDebuggerUrl));
-    for (const [id, entry] of this.frameClients.entries()) {
-      if (!activeIds.has(id) || entry.client?.closed) {
-        try { entry.client?.close(); } catch {}
-        this.frameClients.delete(id);
-      }
+    for (const id of this.frameStates.keys()) {
+      if (!activeIds.has(id)) this.frameStates.delete(id);
     }
     if (!effectiveSettings) {
-      for (const entry of this.frameClients.values()) {
-        try {
-          await entry.client.evaluate("window.__agyDreamPluginFrameV2?.destroy?.()");
-        } catch {}
-      }
-      this.closeFrameClients();
+      await Promise.allSettled(
+        pluginFrames.map(async (t) => {
+          const fc = this.createClient(t.webSocketDebuggerUrl, { handshakeTimeout: 1000, requestTimeout: 1200 });
+          try {
+            await fc.evaluate("window.__agyDreamPluginFrameV2?.destroy?.()");
+          } catch {
+          } finally {
+            try { fc?.close(); } catch {}
+          }
+        })
+      );
+      this.frameStates.clear();
       return;
     }
     const framePayload = {
@@ -168,24 +172,41 @@ class HostController {
       glass: effectiveSettings.glass || {},
     };
     const frameSig = JSON.stringify(framePayload);
-    for (const t of pluginFrames) {
-      const id = t.id || t.webSocketDebuggerUrl;
-      let entry = this.frameClients.get(id);
-      if (!entry || entry.client?.closed) {
-        entry = { client: this.createClient(t.webSocketDebuggerUrl), signature: null };
-        this.frameClients.set(id, entry);
-      }
-      if (entry.signature === frameSig) continue;
-      try {
-        await entry.client.evaluate(
-          "(" + installPluginFrameTheme.toString() + ")(" + JSON.stringify(framePayload) + ")"
-        );
-        entry.signature = frameSig;
-      } catch {
-        try { entry.client?.close(); } catch {}
-        this.frameClients.delete(id);
-      }
-    }
+    const now = Date.now();
+    await Promise.allSettled(
+      pluginFrames.map(async (t) => {
+        const id = t.id || t.webSocketDebuggerUrl;
+        const prev = this.frameStates.get(id);
+        const matched = Boolean(prev && prev.sig === frameSig && prev.url === t.url);
+        if (matched && now - (prev.checkedAt || 0) < 10000) return;
+        const fc = this.createClient(t.webSocketDebuggerUrl, { handshakeTimeout: 1200, requestTimeout: 1500 });
+        try {
+          if (matched) {
+            const alive = await fc.evaluate(
+              "Boolean(window.__agyDreamPluginFrameV2&&window.__agyDreamPluginFrameV2.owner===" +
+                JSON.stringify(this.owner) +
+                "&&window.__agyDreamPluginFrameV2.rev===4)"
+            );
+            if (alive) {
+              this.frameStates.set(id, { sig: frameSig, url: t.url, checkedAt: now });
+              return;
+            }
+          }
+          const res = await fc.evaluate(
+            "(" + installPluginFrameTheme.toString() + ")(" + JSON.stringify(framePayload) + ")"
+          );
+          if (res && res.applied) {
+            this.frameStates.set(id, { sig: frameSig, url: t.url, checkedAt: now });
+          } else {
+            this.frameStates.delete(id);
+          }
+        } catch {
+          this.frameStates.delete(id);
+        } finally {
+          try { fc?.close(); } catch {}
+        }
+      })
+    );
   }
   start(settings) {
     clearInterval(this.timer);
@@ -210,7 +231,7 @@ class HostController {
         await this.client.evaluate("window.__agyDreamSkinV2?.owner===" + JSON.stringify(this.owner) + " ? window.__agyDreamSkinV2.destroy() : null");
       }
     } catch {}
-    this.closeFrameClients();
+    this.frameStates.clear();
     this.client?.close();
   }
 }

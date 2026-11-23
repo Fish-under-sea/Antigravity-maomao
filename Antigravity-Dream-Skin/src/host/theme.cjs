@@ -1,7 +1,7 @@
 // Serialized into the host by its existing local CDP endpoint. No app files are modified.
 async function installTheme(config) {
   const key = "__agyDreamSkinV2";
-  const THEME_REV = 21;
+  const THEME_REV = 25;
   if (window[key]) {
     if (window[key].owner && window[key].owner !== config.owner) {
       const dead = typeof window[key].lastSeen === "number" && Date.now() - window[key].lastSeen > 15000;
@@ -703,11 +703,10 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
  }
  html.agy-dream-active-v2 [data-testid="aux-pane-split"] .flex-grow.overflow-hidden:has([data-testid="sidecar-iframe"]) {
    border-radius: var(--agy-radius-card, 16px) !important;
-   overflow: hidden !important;
-   background-color: color-mix(in srgb, var(--lg-surface) var(--agy-glass-content-fill, 60%), transparent) !important;
-   -webkit-backdrop-filter: var(--lg-filter-content, blur(22px) saturate(165%)) !important;
-   backdrop-filter: var(--lg-filter-content, blur(22px) saturate(165%)) !important;
-   box-shadow: inset 0 1px 0 var(--lg-rim-inset-top), inset 0 -1px 0 var(--lg-rim-shade), inset 0 0 0 1px var(--lg-rim-line), var(--lg-shadow-pop) !important;
+   background-color: transparent !important;
+   -webkit-backdrop-filter: none !important;
+   backdrop-filter: none !important;
+   box-shadow: inset 0 0 0 1px var(--lg-rim-line) !important;
  }
  html.agy-dream-active-v2 [data-testid="sidecar-iframe-slot"] {
    background: transparent !important;
@@ -718,6 +717,40 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
    border: 0 !important;
    padding: 4px !important;
    border-radius: var(--agy-radius-card, 16px) !important;
+ }
+ /* 为 Swarm 侧栏在宿主侧的非 iframe 右栏容器上铺设独立 GPU 磨砂底板：
+    绝不触碰 [data-testid="sidecar-iframe-slot"] 及其内部 OOPIF（否则 Chromium Viz 会在样式重载时令 OOPIF 崩溃灰屏），
+    利用位于其正后方、不含任何 iframe 的 [data-testid="aux-pane-split"] > div:last-child 铺设 ::before 轻磨砂 + ::after 顶部 38px 强模糊羽化！ */
+ html.agy-dream-active-v2:has([data-testid="sidecar-iframe-slot"]:not([style*="display: none"]) iframe[src^="plugin://swarm"]) [data-testid="aux-pane-split"] > div:last-child {
+   position: relative !important;
+ }
+ html.agy-dream-active-v2:has([data-testid="sidecar-iframe-slot"]:not([style*="display: none"]) iframe[src^="plugin://swarm"]) [data-testid="aux-pane-split"] > div:last-child::before {
+   content: "" !important;
+   position: absolute !important;
+   top: 44px !important;
+   left: 4px !important;
+   right: 4px !important;
+   bottom: 4px !important;
+   z-index: 0 !important;
+   pointer-events: none !important;
+   border-radius: var(--agy-radius-inner, 11px) !important;
+   -webkit-backdrop-filter: blur(14px) saturate(145%) !important;
+   backdrop-filter: blur(14px) saturate(145%) !important;
+ }
+ html.agy-dream-active-v2:has([data-testid="sidecar-iframe-slot"]:not([style*="display: none"]) iframe[src^="plugin://swarm"]) [data-testid="aux-pane-split"] > div:last-child::after {
+   content: "" !important;
+   position: absolute !important;
+   top: 44px !important;
+   left: 4px !important;
+   right: 4px !important;
+   height: 146px !important;
+   z-index: 0 !important;
+   pointer-events: none !important;
+   border-radius: var(--agy-radius-inner, 11px) var(--agy-radius-inner, 11px) 0 0 !important;
+   -webkit-backdrop-filter: blur(38px) saturate(185%) !important;
+   backdrop-filter: blur(38px) saturate(185%) !important;
+   -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 84%, transparent 100%) !important;
+   mask-image: linear-gradient(to bottom, #000 0%, #000 84%, transparent 100%) !important;
  }
  html.agy-dream-active-v2 [data-agy-theme-style="star-neko"] :is([role=tab][aria-selected=true], [role=tab][data-state=active]) {
    background: linear-gradient(180deg, rgba(164, 136, 235, .28), rgba(118, 92, 180, .14)) !important;
@@ -976,11 +1009,19 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
   let mediaEl = null;
   let currentKind = "";
   let currentSrc = "";
+  let mediaMountedAt = 0;
+  let videoErrorRetries = 0;
   let videoRecoverTimer = 0;
   let videoWatchdog = null;
   let lastVideoTime = -1;
   let stalledBeats = 0;
   let dragCleanup = null;
+
+  function withCacheBust(url) {
+    if (!url || !/^https?:\/\//.test(url)) return url;
+    const sep = url.includes("?") ? "&" : "?";
+    return url.replace(/([?&])_r=\d+/g, "").replace(/[?&]$/, "") + sep + "_r=" + Date.now();
+  }
 
   function playVideoSafely(v) {
     if (!v || !active || currentKind !== "video" || config.videoPaused || document.hidden) return;
@@ -990,6 +1031,15 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
     } catch {}
   }
 
+  function reloadVideoMedia() {
+    if (!mediaEl || !active || currentKind !== "video" || !currentSrc) return;
+    try {
+      mediaEl.src = withCacheBust(currentSrc);
+      mediaEl.load();
+    } catch {}
+    playVideoSafely(mediaEl);
+  }
+
   function onVisibilityChange() {
     if (!mediaEl || currentKind !== "video") return;
     if (document.hidden) {
@@ -997,11 +1047,22 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
         mediaEl.pause();
       } catch {}
     } else {
-      playVideoSafely(mediaEl);
+      videoErrorRetries = 0;
+      if (mediaEl.error || mediaEl.readyState === 0) reloadVideoMedia();
+      else playVideoSafely(mediaEl);
     }
+  }
+  function onWindowFocus() {
+    if (!mediaEl || !active || currentKind !== "video" || config.videoPaused || document.hidden) return;
+    videoErrorRetries = 0;
+    if (mediaEl.error || mediaEl.readyState === 0) reloadVideoMedia();
+    else if (mediaEl.paused) playVideoSafely(mediaEl);
   }
   if (typeof document.addEventListener === "function") {
     document.addEventListener("visibilitychange", onVisibilityChange);
+  }
+  if (typeof window.addEventListener === "function") {
+    window.addEventListener("focus", onWindowFocus);
   }
 
   function releaseMedia() {
@@ -1042,6 +1103,8 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
     releaseMedia();
     currentKind = kind;
     currentSrc = src;
+    mediaMountedAt = Date.now();
+    videoErrorRetries = 0;
     mediaEl = document.createElement(kind === "video" ? "video" : "img");
     mediaEl.id = "agy-dream-media-v2";
     Object.assign(mediaEl.style, {
@@ -1077,39 +1140,29 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
         clearTimeout(videoRecoverTimer);
         videoRecoverTimer = setTimeout(() => playVideoSafely(mediaEl), 700);
       };
-      let errorRetries = 0;
       let zeroReadyBeats = 0;
       mediaEl.addEventListener("stalled", scheduleRecover);
       mediaEl.addEventListener("waiting", scheduleRecover);
       mediaEl.addEventListener("playing", () => {
-        errorRetries = 0;
+        videoErrorRetries = 0;
         zeroReadyBeats = 0;
       });
       mediaEl.addEventListener("error", () => {
-        if (!active || currentKind !== "video" || !mediaEl || errorRetries >= 4) return;
-        errorRetries++;
+        if (!active || currentKind !== "video" || !mediaEl || videoErrorRetries >= 6) return;
+        videoErrorRetries++;
         clearTimeout(videoRecoverTimer);
         videoRecoverTimer = setTimeout(() => {
-          if (!active || currentKind !== "video" || !mediaEl) return;
-          try {
-            mediaEl.src = src;
-            mediaEl.load();
-          } catch {}
-          playVideoSafely(mediaEl);
-        }, Math.min(4000, errorRetries * 1000));
+          reloadVideoMedia();
+        }, Math.min(5000, videoErrorRetries * 1000));
       });
       videoWatchdog = setInterval(() => {
         if (!active || currentKind !== "video" || !mediaEl || document.hidden || config.videoPaused) return;
-        if (mediaEl.readyState === 0) {
+        if (mediaEl.error || mediaEl.readyState === 0) {
           zeroReadyBeats++;
-          if (zeroReadyBeats >= 2 && errorRetries < 4) {
+          if (zeroReadyBeats >= 2 && videoErrorRetries < 6) {
             zeroReadyBeats = 0;
-            errorRetries++;
-            try {
-              mediaEl.src = src;
-              mediaEl.load();
-            } catch {}
-            playVideoSafely(mediaEl);
+            videoErrorRetries++;
+            reloadVideoMedia();
           }
           return;
         }
@@ -1689,6 +1742,9 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
       document.removeEventListener("transitionstart", onSplitTransitionStart, true);
       document.removeEventListener("transitionend", onSplitTransitionEnd, true);
     }
+    if (typeof window.removeEventListener === "function") {
+      window.removeEventListener("focus", onWindowFocus);
+    }
     observer?.disconnect();
     bodyObserver?.disconnect();
     resize?.disconnect();
@@ -1727,14 +1783,24 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
   resize = new ResizeObserver(schedule);
   resize.observe(root);
 
-  const status = () => ({
-    applied: active && root.isConnected && layer.isConnected && style.isConnected,
-    mediaKind: currentKind,
-    protected: root.querySelectorAll("[data-agy-dream-protect]").length,
-    surfaces: root.querySelectorAll("[data-agy-dream-clear]").length,
-    trackedChanges: saved.length,
-    chatWidth: localChatWidth !== null ? localChatWidth : configChatWidth,
-  });
+  const status = () => {
+    const mediaHealthy = Boolean(
+      mediaEl &&
+        mediaEl.isConnected &&
+        !mediaEl.error &&
+        (currentKind !== "video" || mediaEl.readyState > 0 || Date.now() - mediaMountedAt < 8000)
+    );
+    return {
+      applied: active && root.isConnected && layer.isConnected && style.isConnected,
+      mediaKind: currentKind,
+      mediaSrc: currentSrc,
+      mediaHealthy,
+      protected: root.querySelectorAll("[data-agy-dream-protect]").length,
+      surfaces: root.querySelectorAll("[data-agy-dream-clear]").length,
+      trackedChanges: saved.length,
+      chatWidth: localChatWidth !== null ? localChatWidth : configChatWidth,
+    };
+  };
   const entry = {
     update,
     destroy,
@@ -1758,11 +1824,14 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
 
 function installPluginFrameTheme(config) {
   const key = "__agyDreamPluginFrameV2";
-  const FRAME_REV = 1;
+  const FRAME_REV = 4;
+  if (document.readyState === "loading") {
+    return { applied: false, loading: true };
+  }
   if (window[key]) {
     if (window[key].owner === config.owner && window[key].rev === FRAME_REV) {
       window[key].update(config);
-      return { applied: true };
+      return { applied: true, rev: FRAME_REV };
     }
     window[key].destroy();
   }
@@ -1772,16 +1841,56 @@ function installPluginFrameTheme(config) {
   const style = document.createElement("style");
   style.id = "agy-dream-plugin-frame-v2";
 
+  function detectLightTheme() {
+    try {
+      const themeAttr = document.documentElement.getAttribute?.("data-theme");
+      if (themeAttr === "dark") return false;
+      const fg = getComputedStyle(document.documentElement).getPropertyValue("--foreground").trim();
+      const m = /^#([0-9a-f]{6})$/i.exec(fg);
+      if (m) {
+        const n = parseInt(m[1], 16);
+        const lum = ((n >> 16) & 255) + ((n >> 8) & 255) + (n & 255);
+        return lum < 260;
+      }
+      if (themeAttr === "light") return true;
+    } catch {}
+    return false;
+  }
+
   function renderCss(cfg) {
     const g = cfg?.glass || {};
     const r = g.regions || {};
     const radius = Math.min(24, Math.max(8, Math.round(Number(g.radius) || 16)));
     const ctFill = Math.min(100, Math.max(0, Math.round(Number(r.content?.fill ?? 60))));
+    const hdFill = Math.min(100, Math.max(0, Math.round(Number(r.header?.fill ?? 84))));
     const starNeko = g.themeStyle !== "official";
-    const cardAlpha = Math.max(0.28, Math.min(0.82, ctFill / 100));
-    const cardBg = starNeko
-      ? `rgba(34, 29, 48, ${cardAlpha})`
-      : `rgba(24, 26, 36, ${cardAlpha})`;
+    const isLight = detectLightTheme();
+
+    const bodyAlpha = Math.max(0.28, Math.min(0.62, (ctFill / 100) * 0.64));
+    const cardAlpha = Math.max(0.38, Math.min(0.84, ctFill / 100));
+    const stickyAlpha = Math.max(0.92, Math.min(0.96, hdFill / 100 + 0.1));
+
+    const bodyTint = isLight
+      ? `rgba(246, 242, 254, ${bodyAlpha})`
+      : starNeko
+        ? `rgba(22, 18, 34, ${bodyAlpha})`
+        : `rgba(14, 16, 24, ${bodyAlpha})`;
+    const cardBg = isLight
+      ? `rgba(255, 255, 255, ${cardAlpha})`
+      : starNeko
+        ? `rgba(34, 29, 48, ${cardAlpha})`
+        : `rgba(24, 26, 36, ${cardAlpha})`;
+    const stickyBg = isLight
+      ? `rgba(248, 245, 255, ${stickyAlpha})`
+      : starNeko
+        ? `rgba(24, 20, 36, ${stickyAlpha})`
+        : `rgba(15, 17, 25, ${stickyAlpha})`;
+    const rimLine = isLight ? "rgba(169, 139, 214, 0.24)" : "rgba(174, 142, 218, 0.22)";
+    const searchBg = isLight ? "rgba(15, 18, 30, 0.06)" : "rgba(255, 255, 255, 0.075)";
+    const searchFocusBg = isLight ? "rgba(255, 255, 255, 0.72)" : "rgba(38, 32, 54, 0.72)";
+    const searchBorder = isLight ? "rgba(150, 122, 200, 0.22)" : "rgba(182, 152, 228, 0.16)";
+    const toastFg = isLight ? "#f8f5ff" : "#151221";
+
     return `
 html.agy-dream-plugin-frame-v2,
 html.agy-dream-plugin-frame-v2:root {
@@ -1792,23 +1901,78 @@ html.agy-dream-plugin-frame-v2:root {
   --card: ${cardBg} !important;
   --sw-card: ${cardBg} !important;
 }
-html.agy-dream-plugin-frame-v2,
-html.agy-dream-plugin-frame-v2 body,
-html.agy-dream-plugin-frame-v2 .board,
-html.agy-dream-plugin-frame-v2 .main,
-html.agy-dream-plugin-frame-v2 .tab-body,
-html.agy-dream-plugin-frame-v2 #root,
-html.agy-dream-plugin-frame-v2 #app {
+html.agy-dream-plugin-frame-v2 {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+html.agy-dream-plugin-frame-v2 body {
+  background-color: ${bodyTint} !important;
+  background-image: none !important;
+}
+html.agy-dream-plugin-frame-v2 :is(.board, .main, .tab-body, #root, #app) {
   background: transparent !important;
   background-color: transparent !important;
   background-image: none !important;
 }
-html.agy-dream-plugin-frame-v2 .header {
-  background: color-mix(in srgb, rgba(255, 255, 255, 0.045) 60%, transparent) !important;
-  background-color: rgba(255, 255, 255, 0.03) !important;
-  border-bottom-color: var(--border, rgba(255, 255, 255, 0.14)) !important;
+/* 让 #tab-feed 的 .toolbar 满宽贴齐左右边缘，彻底消除左右留白缺口，其余标签页与帖子正文仍精确保持 --inline 居中列宽 */
+html.agy-dream-plugin-frame-v2 .main {
+  padding-inline: 0 !important;
 }
-html.agy-dream-plugin-frame-v2 :is(.card, .sw-card, .pane, [class*="bg-background"]) {
+html.agy-dream-plugin-frame-v2 .tab-body:not(#tab-feed) {
+  padding-inline: var(--inline) !important;
+}
+html.agy-dream-plugin-frame-v2 #tab-feed > :not(.toolbar):not(.jump) {
+  padding-inline: var(--inline) !important;
+}
+/* Swarm 顶栏 + 搜索工具栏：完全统一色值与强磨砂，彻底删除中间 border-bottom 与亚像素缝隙使其无缝融为一体 */
+html.agy-dream-plugin-frame-v2 .header,
+html.agy-dream-plugin-frame-v2 header[class*="sticky"],
+html.agy-dream-plugin-frame-v2 #tab-feed > .toolbar {
+  background-color: ${stickyBg} !important;
+  -webkit-backdrop-filter: blur(38px) saturate(185%) !important;
+  backdrop-filter: blur(38px) saturate(185%) !important;
+}
+html.agy-dream-plugin-frame-v2 .header,
+html.agy-dream-plugin-frame-v2 header[class*="sticky"] {
+  border-bottom: 0 !important;
+  box-shadow: inset 0 -1px 0 ${rimLine}, 0 6px 20px rgba(0, 0, 0, 0.22) !important;
+}
+html.agy-dream-plugin-frame-v2 .header .tab::after {
+  bottom: 0 !important;
+}
+html.agy-dream-plugin-frame-v2 .board:has(#tab-feed.active) .header {
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+}
+html.agy-dream-plugin-frame-v2 #tab-feed > .toolbar {
+  top: var(--agy-header-h, var(--header-h, 0px)) !important;
+  width: 100% !important;
+  margin-inline: 0 !important;
+  padding-inline: var(--inline) !important;
+  padding-top: 8px !important;
+  padding-bottom: 10px !important;
+  clip-path: none !important;
+  border-top: 0 !important;
+  border-bottom: 1px solid ${rimLine} !important;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22) !important;
+}
+html.agy-dream-plugin-frame-v2 #tab-feed > .toolbar.stuck {
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.28) !important;
+}
+html.agy-dream-plugin-frame-v2 #tab-feed > .toolbar .search {
+  background-color: ${searchBg} !important;
+  border-color: ${searchBorder} !important;
+}
+html.agy-dream-plugin-frame-v2 #tab-feed > .toolbar .search:focus-within {
+  background-color: ${searchFocusBg} !important;
+}
+html.agy-dream-plugin-frame-v2 .segmented button.on {
+  background-color: ${cardBg} !important;
+}
+html.agy-dream-plugin-frame-v2 .toast {
+  color: ${toastFg} !important;
+}
+html.agy-dream-plugin-frame-v2 [class*="bg-background"] {
   background-color: transparent !important;
 }
 html.agy-dream-plugin-frame-v2 :is(.card, .sw-card) {
@@ -1825,10 +1989,29 @@ html.agy-dream-plugin-frame-v2 ::-webkit-scrollbar-thumb {
 }`;
   }
 
+  let headerRo = null;
+  function syncHeaderHeight() {
+    try {
+      const board = document.getElementById?.("board");
+      const header = document.querySelector?.(".header");
+      if (!board || !header || typeof header.getBoundingClientRect !== "function") return;
+      const h = header.getBoundingClientRect().height;
+      if (h > 0) {
+        const dpr = Number(window.devicePixelRatio) || 1;
+        const exact = Math.floor(h * dpr) / dpr;
+        board.style.setProperty("--agy-header-h", exact + "px");
+      }
+    } catch {}
+  }
+
   function update(next) {
     style.textContent = renderCss(next);
+    syncHeaderHeight();
   }
   function destroy() {
+    try { headerRo?.disconnect(); } catch {}
+    headerRo = null;
+    try { document.getElementById?.("board")?.style?.removeProperty("--agy-header-h"); } catch {}
     style.remove();
     document.documentElement.classList.remove("agy-dream-plugin-frame-v2");
     delete window[key];
@@ -1838,8 +2021,15 @@ html.agy-dream-plugin-frame-v2 ::-webkit-scrollbar-thumb {
   head.appendChild(style);
   document.documentElement.classList.add("agy-dream-plugin-frame-v2");
   update(config);
+  try {
+    const header = document.querySelector?.(".header");
+    if (header && typeof ResizeObserver === "function") {
+      headerRo = new ResizeObserver(syncHeaderHeight);
+      headerRo.observe(header);
+    }
+  } catch {}
   window[key] = { rev: FRAME_REV, owner: config.owner, update, destroy };
-  return { applied: true };
+  return { applied: true, rev: FRAME_REV };
 }
 
 module.exports = { installTheme, installPluginFrameTheme };

@@ -33,7 +33,7 @@ function fixture(){
     const payload=JSON.parse(expression.slice(expression.lastIndexOf(")({")+2,-1));
     applied.push(payload);
     if(blockApply){const gate=blockApply;blockApply=null;await gate;}
-    state={themed:true,owner:payload.owner,rev:21};
+    state={themed:true,owner:payload.owner,rev:25};
     return {applied:true};
    }
    if(expression.includes("touch?.()")){
@@ -488,7 +488,7 @@ test('DreamSkinSettings sanitizes videoSmoothMode and chatWidth, and HostControl
 
  let patched=null;
  let applyCount=0;
- let state={ready:'complete',themed:true,owner:'drag-owner',rev:21,stale:false,chatWidth:91};
+ let state={ready:'complete',themed:true,owner:'drag-owner',rev:25,stale:false,chatWidth:91};
  const client={
   closed:false,
   async evaluate(expression){
@@ -580,7 +580,9 @@ test('installTheme REV 10 eliminates black fades, slims scrollbars, optimizes 4K
   });
   const baseCss=headEl.children.find(c=>c.id==='agy-dream-style-v2')?.textContent||'';
   const tokenCss=headEl.children.find(c=>c.id==='agy-dream-tokens-v2')?.textContent||'';
-  assert.equal(global.window.__agyDreamSkinV2.rev,21);
+  assert.equal(global.window.__agyDreamSkinV2.rev,25);
+  assert.match(baseCss,/\[data-testid="aux-pane-split"\]\s*>\s*div:last-child::after[\s\S]*backdrop-filter:\s*blur\(38px\)/);
+  assert.doesNotMatch(baseCss,/\[data-testid="sidecar-iframe-slot"\]:has\([^)]*\)::(before|after)/);
   assert.match(baseCss,/\[data-select-popup\]/);
   assert.match(baseCss,/:not\(\.toast-root\):not\(\.toast-viewport \*\)/);
   assert.doesNotMatch(baseCss,/\[role=dialog\][\s\S]{0,120}z-index:\s*9999/);
@@ -644,7 +646,7 @@ test('HostController upgrades legacy rev 9 plugin owner while still leaving unre
    if(expression.startsWith('(async function installTheme')){
     const payload=JSON.parse(expression.slice(expression.lastIndexOf(')({')+2,-1));
     applied.push(payload);
-    state={themed:true,owner:payload.owner,rev:21};
+    state={themed:true,owner:payload.owner,rev:25};
     return {applied:true};
    }
    if(expression.includes('destroy()')){destroys++;state={themed:false};return null;}
@@ -664,28 +666,38 @@ test('HostController upgrades legacy rev 9 plugin owner while still leaving unre
  await hc.stop();
 });
 
-test('HostController styles third-party plugin iframes (e.g. Swarm) with transparent glass and cleans up on disable',async()=>{
+test('HostController styles third-party plugin iframes (e.g. Swarm) with short-lived connections, blurred sticky header, and heals dropped wallpaper media',async()=>{
+ const {installPluginFrameTheme}=require('../src/host/theme.cjs');
  const frameOps=[];
+ let frameCloseCount=0;
+ let mainApplyCount=0;
+ let mainState={ready:'complete',themed:true,mediaHealthy:true,mediaSrc:'http://127.0.0.1:1/media?v=1',owner:'swarm-test',rev:25,stale:false};
  const mainClient={
   closed:false,
   async evaluate(expression){
-   if(expression.startsWith('({ready:'))return {ready:'complete',themed:true,owner:'swarm-test',rev:21,stale:false};
+   if(expression.startsWith('({ready:'))return {...mainState};
+   if(expression.startsWith('(async function installTheme')){
+    mainApplyCount++;
+    mainState={...mainState,mediaHealthy:true,mediaSrc:'http://127.0.0.1:1/media?v=1'};
+    return {applied:true,mediaHealthy:true};
+   }
    if(expression.includes('touch?.()'))return true;
    if(expression.includes('destroy()'))return {removed:true};
    return {applied:true};
   },
   close(){this.closed=true;}
  };
- const frameClient={
+ const makeFrameClient=()=>({
   closed:false,
   async evaluate(expression){
    frameOps.push(expression);
+   if(expression.startsWith('Boolean(window.__agyDreamPluginFrameV2'))return false;
    return {applied:true};
   },
-  close(){this.closed=true;}
- };
+  close(){this.closed=true;frameCloseCount++;}
+ });
  const hc=new HostController(
-  {payload:cfg=>({...cfg,image:'data:image/png;base64,AA=='})},
+  {payload:cfg=>({...cfg,mediaUrl:'http://127.0.0.1:1/media?v=1',image:'data:image/png;base64,AA=='})},
   ()=>{},
   {
    owner:'swarm-test',
@@ -694,14 +706,54 @@ test('HostController styles third-party plugin iframes (e.g. Swarm) with transpa
     {id:'f-swarm',type:'iframe',url:'plugin://swarm--swarm_board-1/?token=1',webSocketDebuggerUrl:'ws://127.0.0.1:55555/frame/swarm'},
     {id:'f-self',type:'iframe',url:'plugin://antigravity-star-suite--star-suite-1/?token=2',webSocketDebuggerUrl:'ws://127.0.0.1:55555/frame/self'}
    ],
-   createClient:url=>url.includes('/frame/swarm')?frameClient:mainClient
+   createClient:url=>url.includes('/frame/swarm')?makeFrameClient():mainClient
   }
  );
- await hc.update({enabled:true,fit:'contain',scrim:12,glass:{themeStyle:'star-neko',radius:16,regions:{content:{fill:60}}}});
+ await hc.update({enabled:true,fit:'contain',scrim:12,glass:{themeStyle:'star-neko',radius:16,regions:{content:{fill:60},header:{fill:84}}}});
  assert.equal(frameOps.length,1);
  assert.match(frameOps[0],/installPluginFrameTheme/);
+ assert.equal(frameCloseCount,1);
+ // Wallpaper media dropped (readyState=0 or error) -> HostController automatically heals on next tick
+ mainState={...mainState,mediaHealthy:false};
+ await hc.tick();
+ assert.equal(mainApplyCount,2);
+ // In-place Swarm iframe reload after check interval -> self-heals by re-injecting theme
+ hc.frameStates.get('f-swarm').checkedAt=0;
+ await hc.tick();
+ assert.equal(frameOps.length,3);
+ assert.match(frameOps[1],/Boolean\(window\.__agyDreamPluginFrameV2/);
+ assert.match(frameOps[2],/installPluginFrameTheme/);
+ assert.equal(frameCloseCount,2);
  await hc.update({enabled:false});
- assert.equal(frameOps.length,2);
- assert.match(frameOps[1],/__agyDreamPluginFrameV2\?\.destroy/);
+ assert.equal(frameOps.length,4);
+ assert.match(frameOps[3],/__agyDreamPluginFrameV2\?\.destroy/);
+ assert.equal(frameCloseCount,3);
  await hc.stop();
+
+ // Verify installPluginFrameTheme skips loading state and applies seamless unified .header + .toolbar + exact --agy-header-h
+ const origDoc=global.document,origWin=global.window,origCS=global.getComputedStyle;
+ try{
+  const head={children:[],appendChild(n){this.children.push(n);}};
+  const docEl={classList:{add(){},remove(){}},getAttribute(){return 'dark';}};
+  const boardProps={};
+  const boardEl={style:{setProperty(k,v){boardProps[k]=v;},removeProperty(k){delete boardProps[k];}}};
+  const headerEl={getBoundingClientRect(){return {height:76.66667};}};
+  global.window={devicePixelRatio:1.5};
+  global.getComputedStyle=()=>({getPropertyValue:()=>'#ffffff'});
+  global.document={readyState:'loading',head,documentElement:docEl,getElementById:id=>id==='board'?boardEl:null,querySelector:sel=>sel==='.header'?headerEl:null,createElement:()=>({id:'',textContent:'',remove(){}})};
+  assert.deepEqual(installPluginFrameTheme({owner:'o1',glass:{}}),{applied:false,loading:true});
+  global.document.readyState='complete';
+  const applied=installPluginFrameTheme({owner:'o1',glass:{themeStyle:'star-neko',radius:16,regions:{content:{fill:60},header:{fill:84}}}});
+  assert.equal(applied.applied,true);
+  const css=head.children[0]?.textContent||'';
+  assert.equal(applied.rev,4);
+  assert.equal(boardProps['--agy-header-h'],(Math.floor(76.66667*1.5)/1.5)+'px');
+  assert.match(css,/\.board:has\(#tab-feed\.active\)\s*\.header\s*\{[\s\S]*border-bottom:\s*0\s*!important/);
+  assert.match(css,/#tab-feed\s*>\s*\.toolbar\s*\{[\s\S]*top:\s*var\(--agy-header-h,\s*var\(--header-h,\s*0px\)\)\s*!important[\s\S]*width:\s*100%\s*!important[\s\S]*margin-inline:\s*0\s*!important[\s\S]*padding-inline:\s*var\(--inline\)\s*!important/);
+  assert.match(css,/backdrop-filter:\s*blur\(38px\)/);
+  global.window.__agyDreamPluginFrameV2.destroy();
+  assert.equal(boardProps['--agy-header-h'],undefined);
+ }finally{
+  global.document=origDoc;global.window=origWin;global.getComputedStyle=origCS;
+ }
 });
