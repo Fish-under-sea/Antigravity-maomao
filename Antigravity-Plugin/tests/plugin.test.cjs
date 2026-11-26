@@ -688,3 +688,114 @@ test("mediaServer exposes CORS /api/maomao/update/apply for host toast, startup 
   assert.equal(offSnap.updateStatus.hasUpdate, false);
   assert.match(offSnap.updateStatus.error, /ENOTFOUND/);
 });
+
+test("plugin web UI renders GitHub Release Markdown safely without raw syntax or XSS", () => {
+  const vm = require("node:vm");
+  const appSrc = fs.readFileSync(path.join(pluginRoot, "sidecars/star-suite/web/app.js"), "utf8");
+  const cssSrc = fs.readFileSync(path.join(pluginRoot, "sidecars/star-suite/web/styles.css"), "utf8");
+
+  assert.match(cssSrc, /\.ss-md-h2\b/);
+  assert.match(cssSrc, /\.ss-md-code\b/);
+  assert.match(cssSrc, /\.ss-md-list\b/);
+  assert.doesNotMatch(cssSrc, /\*\s*\{[^}]*scrollbar-width\s*:/);
+
+  const startIdx = appSrc.indexOf("function isSafeHttpUrl(");
+  const endIdx = appSrc.indexOf("function renderUpdateStatus(");
+  assert.ok(startIdx > 0 && endIdx > startIdx, "expected Markdown renderer helpers in app.js");
+  const snippet = appSrc.slice(startIdx, endIdx);
+
+  function makeNode(tag, text = "") {
+    return {
+      tagName: tag,
+      className: "",
+      dataset: {},
+      children: [],
+      textValue: text,
+      get textContent() {
+        return this.tagName === "#text"
+          ? this.textValue
+          : this.children.map((c) => c.textContent).join("");
+      },
+      set textContent(v) {
+        if (this.tagName === "#text") {
+          this.textValue = String(v ?? "");
+        } else {
+          this.children = v === "" ? [] : [makeNode("#text", String(v))];
+        }
+      },
+      appendChild(child) {
+        if (child.tagName === "#fragment") {
+          this.children.push(...child.children);
+        } else {
+          this.children.push(child);
+        }
+        return child;
+      },
+    };
+  }
+
+  const fakeDoc = {
+    createElement: (tag) => makeNode(String(tag).toUpperCase()),
+    createTextNode: (txt) => makeNode("#text", String(txt)),
+    createDocumentFragment: () => makeNode("#fragment"),
+  };
+
+  const sandbox = { document: fakeDoc, URL };
+  vm.runInNewContext(`${snippet}\nthis.renderMarkdownNotes = renderMarkdownNotes;`, sandbox);
+
+  const md = [
+    "## 喵言喵语 v0.4.2",
+    "",
+    "本次为 `v0.4.1` 后的修复，支持 **富文本** 与 *斜体* 和 ~~删除~~。",
+    "",
+    "### 修复内容",
+    "1. **修复 Markdown 渲染** (`app.js`)",
+    "   - 支持 [查看 Release](https://github.com/Fish-under-sea/Antigravity-maomao/releases)",
+    "   - 拦截 [恶意链接](javascript:alert(1)) 与 <script>alert(1)</script>",
+    "",
+    "> 引用说明",
+    "",
+    "```js",
+    "const ok = true;",
+    "```",
+  ].join("\n");
+
+  const container = makeNode("DIV");
+  sandbox.renderMarkdownNotes(container, md);
+
+  const tags = [];
+  const walk = (n) => {
+    tags.push(n.tagName);
+    for (const c of n.children || []) walk(c);
+  };
+  walk(container);
+
+  assert.ok(tags.includes("H2"), "renders ## as H2");
+  assert.ok(tags.includes("H3"), "renders ### as H3");
+  assert.ok(tags.includes("P"), "renders paragraph");
+  assert.ok(tags.includes("STRONG"), "renders **bold**");
+  assert.ok(tags.includes("EM"), "renders *italic*");
+  assert.ok(tags.includes("DEL"), "renders ~~strike~~");
+  assert.ok(tags.includes("CODE"), "renders `code`");
+  assert.ok(tags.includes("OL"), "renders ordered list");
+  assert.ok(tags.includes("UL"), "renders nested unordered list");
+  assert.ok(tags.includes("BLOCKQUOTE"), "renders blockquote");
+  assert.ok(tags.includes("PRE"), "renders fenced code block");
+  assert.ok(!tags.includes("SCRIPT"), "must never construct <script> element");
+
+  const links = [];
+  const collectLinks = (n) => {
+    if (n.tagName === "A") links.push(n);
+    for (const c of n.children || []) collectLinks(c);
+  };
+  collectLinks(container);
+  assert.equal(links.length, 1, "only https link is rendered as <a>, javascript: link is neutralized");
+  assert.equal(links[0].href, "https://github.com/Fish-under-sea/Antigravity-maomao/releases");
+  assert.ok(container.textContent.includes("<script>alert(1)</script>"), "HTML is preserved as inert text");
+  assert.ok(!container.textContent.includes("## "), "raw heading hashes are stripped");
+
+  // Re-rendering identical Markdown preserves existing DOM nodes (no scroll reset)
+  const firstChild = container.children[0];
+  sandbox.renderMarkdownNotes(container, md);
+  assert.equal(container.children[0], firstChild);
+});

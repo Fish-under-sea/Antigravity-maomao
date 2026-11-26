@@ -943,6 +943,218 @@
     renderUpdateStatus(state.updateStatus);
   }
 
+  function isSafeHttpUrl(raw) {
+    try {
+      const u = new URL(String(raw || "").trim());
+      return u.protocol === "https:" || u.protocol === "http:";
+    } catch {
+      return false;
+    }
+  }
+
+  function appendInlineMarkdown(parent, text) {
+    const src = String(text || "");
+    const tokenRe = /`([^`\n]+)`|\[([^\]]+)\]\(([^)\s]+)\)|\*\*([^*]+)\*\*|__([^_]+)__|\*([^*\n]+)\*|~~([^~\n]+)~~|(https?:\/\/[^\s<>()]+[^\s<>().,;:!?"'\]])/g;
+    let last = 0;
+    let m;
+    while ((m = tokenRe.exec(src)) !== null) {
+      if (m.index > last) {
+        parent.appendChild(document.createTextNode(src.slice(last, m.index)));
+      }
+      if (m[1] !== undefined) {
+        const code = document.createElement("code");
+        code.className = "ss-md-code";
+        code.textContent = m[1];
+        parent.appendChild(code);
+      } else if (m[2] !== undefined && m[3] !== undefined) {
+        if (isSafeHttpUrl(m[3])) {
+          const a = document.createElement("a");
+          a.className = "ss-md-link";
+          a.href = m[3].trim();
+          a.target = "_blank";
+          a.rel = "noopener noreferrer";
+          appendInlineMarkdown(a, m[2]);
+          parent.appendChild(a);
+        } else {
+          parent.appendChild(document.createTextNode(m[2]));
+        }
+      } else if (m[4] !== undefined || m[5] !== undefined) {
+        const strong = document.createElement("strong");
+        appendInlineMarkdown(strong, m[4] !== undefined ? m[4] : m[5]);
+        parent.appendChild(strong);
+      } else if (m[6] !== undefined) {
+        const em = document.createElement("em");
+        appendInlineMarkdown(em, m[6]);
+        parent.appendChild(em);
+      } else if (m[7] !== undefined) {
+        const del = document.createElement("del");
+        appendInlineMarkdown(del, m[7]);
+        parent.appendChild(del);
+      } else if (m[8] !== undefined) {
+        if (isSafeHttpUrl(m[8])) {
+          const a = document.createElement("a");
+          a.className = "ss-md-link";
+          a.href = m[8];
+          a.target = "_blank";
+          a.rel = "noopener noreferrer";
+          a.textContent = m[8];
+          parent.appendChild(a);
+        } else {
+          parent.appendChild(document.createTextNode(m[8]));
+        }
+      }
+      last = tokenRe.lastIndex;
+    }
+    if (last < src.length) {
+      parent.appendChild(document.createTextNode(src.slice(last)));
+    }
+  }
+
+  function renderMarkdownNotes(container, markdown) {
+    if (!container) return;
+    const normalized = String(markdown || "").replace(/\r\n?/g, "\n").trim();
+    if (container.dataset && container.dataset.mdSrc === normalized) return;
+    if (container.dataset) container.dataset.mdSrc = normalized;
+    container.textContent = "";
+    if (!normalized) return;
+
+    const frag = document.createDocumentFragment();
+    const lines = normalized.split("\n");
+    let i = 0;
+
+    while (i < lines.length) {
+      const line = lines[i];
+      if (!line.trim()) {
+        i += 1;
+        continue;
+      }
+
+      // Fenced code block
+      const fenceMatch = line.match(/^\s*```([\w-]*)\s*$/);
+      if (fenceMatch) {
+        const codeLines = [];
+        i += 1;
+        while (i < lines.length && !/^\s*```\s*$/.test(lines[i])) {
+          codeLines.push(lines[i]);
+          i += 1;
+        }
+        if (i < lines.length) i += 1;
+        const pre = document.createElement("pre");
+        pre.className = "ss-md-pre";
+        const code = document.createElement("code");
+        code.textContent = codeLines.join("\n");
+        pre.appendChild(code);
+        frag.appendChild(pre);
+        continue;
+      }
+
+      // Horizontal rule
+      if (/^\s*(?:---+|\*\*\*+|___+)\s*$/.test(line)) {
+        const hr = document.createElement("hr");
+        hr.className = "ss-md-hr";
+        frag.appendChild(hr);
+        i += 1;
+        continue;
+      }
+
+      // Heading (#..####)
+      const headMatch = line.match(/^\s*(#{1,4})\s+(.+?)\s*#*$/);
+      if (headMatch) {
+        const lvl = Math.min(4, headMatch[1].length);
+        const h = document.createElement(`h${lvl}`);
+        h.className = `ss-md-h ss-md-h${lvl}`;
+        appendInlineMarkdown(h, headMatch[2]);
+        frag.appendChild(h);
+        i += 1;
+        continue;
+      }
+
+      // Blockquote
+      if (/^\s*>\s?/.test(line)) {
+        const quoteLines = [];
+        while (i < lines.length && /^\s*>\s?/.test(lines[i])) {
+          quoteLines.push(lines[i].replace(/^\s*>\s?/, ""));
+          i += 1;
+        }
+        const bq = document.createElement("blockquote");
+        bq.className = "ss-md-quote";
+        quoteLines.forEach((ql, idx) => {
+          if (idx > 0) bq.appendChild(document.createElement("br"));
+          appendInlineMarkdown(bq, ql);
+        });
+        frag.appendChild(bq);
+        continue;
+      }
+
+      // List (unordered or ordered, supporting 1-level indented sublists)
+      const listStart = line.match(/^(\s*)(?:([-*+])|(\d+)\.)\s+(.+)$/);
+      if (listStart) {
+        const baseIndent = listStart[1].length;
+        const rootOrdered = Boolean(listStart[3]);
+        const listEl = document.createElement(rootOrdered ? "ol" : "ul");
+        listEl.className = "ss-md-list";
+        let lastLi = null;
+        let lastSubList = null;
+        let lastSubOrdered = null;
+
+        while (i < lines.length) {
+          const itemMatch = lines[i].match(/^(\s*)(?:([-*+])|(\d+)\.)\s+(.+)$/);
+          if (!itemMatch) break;
+          const indent = itemMatch[1].length;
+          const ordered = Boolean(itemMatch[3]);
+          const body = itemMatch[4];
+
+          if (indent >= baseIndent + 2 && lastLi) {
+            if (!lastSubList || lastSubOrdered !== ordered) {
+              lastSubList = document.createElement(ordered ? "ol" : "ul");
+              lastSubList.className = "ss-md-sublist";
+              lastLi.appendChild(lastSubList);
+              lastSubOrdered = ordered;
+            }
+            const subLi = document.createElement("li");
+            appendInlineMarkdown(subLi, body);
+            lastSubList.appendChild(subLi);
+          } else {
+            if (ordered !== rootOrdered && indent <= baseIndent) break;
+            const li = document.createElement("li");
+            appendInlineMarkdown(li, body);
+            listEl.appendChild(li);
+            lastLi = li;
+            lastSubList = null;
+            lastSubOrdered = null;
+          }
+          i += 1;
+        }
+        frag.appendChild(listEl);
+        continue;
+      }
+
+      // Paragraph
+      const paraLines = [];
+      while (
+        i < lines.length &&
+        lines[i].trim() &&
+        !/^\s*(?:```|#{1,4}\s+|>\s?|(?:---+|\*\*\*+|___+)\s*$|[-*+]\s+|\d+\.\s+)/.test(lines[i])
+      ) {
+        paraLines.push(lines[i].trim());
+        i += 1;
+      }
+      if (paraLines.length) {
+        const p = document.createElement("p");
+        p.className = "ss-md-p";
+        paraLines.forEach((pl, idx) => {
+          if (idx > 0) p.appendChild(document.createElement("br"));
+          appendInlineMarkdown(p, pl);
+        });
+        frag.appendChild(p);
+      } else {
+        i += 1;
+      }
+    }
+
+    container.appendChild(frag);
+  }
+
   function renderUpdateStatus(up) {
     if (!up || !el.updateStatusText) return;
     const hasUpdate = Boolean(up.hasUpdate && up.downloadUrl);
@@ -972,7 +1184,10 @@
       el.updateNotesBox.classList.toggle("hidden", !notes && !relUrl);
     }
     if (el.updateNotesText) {
-      el.updateNotesText.textContent = notes || (relUrl ? "点击下方链接查看本版本详细更新日志。" : "");
+      renderMarkdownNotes(
+        el.updateNotesText,
+        notes || (relUrl ? "点击下方链接查看本版本详细更新日志。" : "")
+      );
     }
     if (el.updateReleaseLink) {
       if (relUrl) {
