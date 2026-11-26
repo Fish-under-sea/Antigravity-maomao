@@ -28,6 +28,79 @@ const DEFAULT_FONT = {
   colorsDark: { main: "", secondary: "", muted: "", faint: "" },
 };
 
+const FEATURE_KEYS = [
+  "telemetry",
+  "effortSlider",
+  "composerBeam",
+  "embeddedPet",
+  "motionFx",
+  "i18n",
+  "workbench",
+];
+
+const DEFAULT_FEATURES = {
+  telemetry: {
+    enabled: true,
+    barMode: "auto",
+    vialEnabled: true,
+    vialStyle: "vial",
+    quotaEnabled: true,
+  },
+  effortSlider: {
+    enabled: true,
+    rememberPerModel: true,
+    crystalOrchestrator: true,
+  },
+  composerBeam: {
+    enabled: false,
+    palette: "star-neko",
+    quotaHalo: false,
+  },
+  embeddedPet: {
+    enabled: true,
+    scale: 100,
+    dock: "right",
+    snap: true,
+    opacity: 100,
+    soundEnabled: true,
+    soundPack: "original",
+    volume: 60,
+    showBubbles: true,
+    hideWhenZen: true,
+  },
+  motionFx: {
+    inkStreamFade: true,
+    semanticAura: true,
+    smoothCaret: false,
+    unreadBadge: true,
+  },
+  i18n: {
+    mode: "auto",
+    swarmEnabled: true,
+  },
+  workbench: {
+    codeFold: true,
+    contextMenu: true,
+    inlineDiff: true,
+    fullTextSearch: true,
+    compactLayout: false,
+    thoughtTranslate: "off",
+    thoughtView: "immersive",
+    thoughtEndpoint: "",
+    thoughtModel: "",
+    thoughtApiKey: "",
+  },
+};
+
+const VALID_BAR_MODES = new Set(["auto", "icons", "full", "off"]);
+const VALID_VIAL_STYLES = new Set(["vial", "bar"]);
+const VALID_BEAM_PALETTES = new Set(["star-neko", "gemini", "aurora", "prism", "neon", "quota"]);
+const VALID_PET_DOCKS = new Set(["right", "left", "free"]);
+const VALID_SOUND_PACKS = new Set(["original", "bubble-pop", "wood-tap", "soft-spring", "interaction"]);
+const VALID_I18N_MODES = new Set(["auto", "on", "off"]);
+const VALID_THOUGHT_TRANSLATE = new Set(["off", "machine", "openai"]);
+const VALID_THOUGHT_VIEW = new Set(["immersive", "bilingual"]);
+
 const DEFAULT_SETTINGS = {
   enabled: false,
   outputMode: "transparent",
@@ -46,10 +119,11 @@ const DEFAULT_SETTINGS = {
   videoPaused: false,
   videoSmoothMode: true,
   chatWidth: 0,
-  widgetAutoLaunch: true,
+  widgetAutoLaunch: false,
   widgetHideTray: true,
   glass: DEFAULT_GLASS,
   font: DEFAULT_FONT,
+  features: DEFAULT_FEATURES,
   protectEditor: true,
   protectTerminal: true,
 };
@@ -61,6 +135,18 @@ function sanitizePath(value) {
   const trimmed = value.trim();
   if (!trimmed || trimmed.length > 4096 || /[\r\n\0]/.test(trimmed)) return "";
   return trimmed;
+}
+
+function sanitizeLineString(value, maxLen = 512, fallback = "") {
+  if (typeof value !== "string") return fallback;
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (trimmed.length > maxLen || /[\r\n\0]/.test(trimmed)) return fallback;
+  return trimmed;
+}
+
+function sanitizeEnum(value, validSet, fallback) {
+  return typeof value === "string" && validSet.has(value) ? value : fallback;
 }
 
 function sanitizeRecentMedia(list) {
@@ -139,6 +225,95 @@ function sanitizeFont(raw, current = DEFAULT_FONT) {
   };
 }
 
+function sanitizeFeatures(raw, current = DEFAULT_FEATURES) {
+  const src = raw && typeof raw === "object" ? raw : {};
+  const cur = current && typeof current === "object" ? current : DEFAULT_FEATURES;
+
+  const tSrc = src.telemetry && typeof src.telemetry === "object" ? src.telemetry : {};
+  const tCur = cur.telemetry || DEFAULT_FEATURES.telemetry;
+
+  const eSrc = src.effortSlider && typeof src.effortSlider === "object" ? src.effortSlider : {};
+  const eCur = cur.effortSlider || DEFAULT_FEATURES.effortSlider;
+
+  const bSrc = src.composerBeam && typeof src.composerBeam === "object" ? src.composerBeam : {};
+  const bCur = cur.composerBeam || DEFAULT_FEATURES.composerBeam;
+
+  const pSrc = src.embeddedPet && typeof src.embeddedPet === "object" ? src.embeddedPet : {};
+  const pCur = cur.embeddedPet || DEFAULT_FEATURES.embeddedPet;
+
+  const mSrc = src.motionFx && typeof src.motionFx === "object" ? src.motionFx : {};
+  const mCur = cur.motionFx || DEFAULT_FEATURES.motionFx;
+
+  const iSrc = src.i18n && typeof src.i18n === "object" ? src.i18n : {};
+  const iCur = cur.i18n || DEFAULT_FEATURES.i18n;
+
+  const wSrc = src.workbench && typeof src.workbench === "object" ? src.workbench : {};
+  const wCur = cur.workbench || DEFAULT_FEATURES.workbench;
+
+  return {
+    telemetry: {
+      enabled: bool(tSrc.enabled, bool(tCur.enabled, DEFAULT_FEATURES.telemetry.enabled)),
+      barMode: sanitizeEnum(tSrc.barMode, VALID_BAR_MODES, sanitizeEnum(tCur.barMode, VALID_BAR_MODES, DEFAULT_FEATURES.telemetry.barMode)),
+      vialEnabled: bool(tSrc.vialEnabled, bool(tCur.vialEnabled, DEFAULT_FEATURES.telemetry.vialEnabled)),
+      vialStyle: sanitizeEnum(tSrc.vialStyle, VALID_VIAL_STYLES, sanitizeEnum(tCur.vialStyle, VALID_VIAL_STYLES, DEFAULT_FEATURES.telemetry.vialStyle)),
+      quotaEnabled: bool(tSrc.quotaEnabled, bool(tCur.quotaEnabled, DEFAULT_FEATURES.telemetry.quotaEnabled)),
+    },
+    effortSlider: {
+      enabled: bool(eSrc.enabled, bool(eCur.enabled, DEFAULT_FEATURES.effortSlider.enabled)),
+      rememberPerModel: bool(eSrc.rememberPerModel, bool(eCur.rememberPerModel, DEFAULT_FEATURES.effortSlider.rememberPerModel)),
+      crystalOrchestrator: bool(eSrc.crystalOrchestrator, bool(eCur.crystalOrchestrator, DEFAULT_FEATURES.effortSlider.crystalOrchestrator)),
+    },
+    composerBeam: {
+      enabled: bool(bSrc.enabled, bool(bCur.enabled, DEFAULT_FEATURES.composerBeam.enabled)),
+      palette: sanitizeEnum(bSrc.palette, VALID_BEAM_PALETTES, sanitizeEnum(bCur.palette, VALID_BEAM_PALETTES, DEFAULT_FEATURES.composerBeam.palette)),
+      quotaHalo: bool(bSrc.quotaHalo, bool(bCur.quotaHalo, DEFAULT_FEATURES.composerBeam.quotaHalo)),
+    },
+    embeddedPet: {
+      enabled: bool(pSrc.enabled, bool(pCur.enabled, DEFAULT_FEATURES.embeddedPet.enabled)),
+      scale: Math.round(finite(pSrc.scale, finite(pCur.scale, DEFAULT_FEATURES.embeddedPet.scale, 60, 160), 60, 160)),
+      dock: sanitizeEnum(pSrc.dock, VALID_PET_DOCKS, sanitizeEnum(pCur.dock, VALID_PET_DOCKS, DEFAULT_FEATURES.embeddedPet.dock)),
+      snap: bool(pSrc.snap, bool(pCur.snap, DEFAULT_FEATURES.embeddedPet.snap)),
+      opacity: Math.round(finite(pSrc.opacity, finite(pCur.opacity, DEFAULT_FEATURES.embeddedPet.opacity, 20, 100), 20, 100)),
+      soundEnabled: bool(pSrc.soundEnabled, bool(pCur.soundEnabled, DEFAULT_FEATURES.embeddedPet.soundEnabled)),
+      soundPack: sanitizeEnum(pSrc.soundPack, VALID_SOUND_PACKS, sanitizeEnum(pCur.soundPack, VALID_SOUND_PACKS, DEFAULT_FEATURES.embeddedPet.soundPack)),
+      volume: Math.round(finite(pSrc.volume, finite(pCur.volume, DEFAULT_FEATURES.embeddedPet.volume, 0, 100), 0, 100)),
+      showBubbles: bool(pSrc.showBubbles, bool(pCur.showBubbles, DEFAULT_FEATURES.embeddedPet.showBubbles)),
+      hideWhenZen: bool(pSrc.hideWhenZen, bool(pCur.hideWhenZen, DEFAULT_FEATURES.embeddedPet.hideWhenZen)),
+    },
+    motionFx: {
+      inkStreamFade: bool(mSrc.inkStreamFade, bool(mCur.inkStreamFade, DEFAULT_FEATURES.motionFx.inkStreamFade)),
+      semanticAura: bool(mSrc.semanticAura, bool(mCur.semanticAura, DEFAULT_FEATURES.motionFx.semanticAura)),
+      smoothCaret: bool(mSrc.smoothCaret, bool(mCur.smoothCaret, DEFAULT_FEATURES.motionFx.smoothCaret)),
+      unreadBadge: bool(mSrc.unreadBadge, bool(mCur.unreadBadge, DEFAULT_FEATURES.motionFx.unreadBadge)),
+    },
+    i18n: {
+      mode: sanitizeEnum(iSrc.mode, VALID_I18N_MODES, sanitizeEnum(iCur.mode, VALID_I18N_MODES, DEFAULT_FEATURES.i18n.mode)),
+      swarmEnabled: bool(iSrc.swarmEnabled, bool(iCur.swarmEnabled, DEFAULT_FEATURES.i18n.swarmEnabled)),
+    },
+    workbench: {
+      codeFold: bool(wSrc.codeFold, bool(wCur.codeFold, DEFAULT_FEATURES.workbench.codeFold)),
+      contextMenu: bool(wSrc.contextMenu, bool(wCur.contextMenu, DEFAULT_FEATURES.workbench.contextMenu)),
+      inlineDiff: bool(wSrc.inlineDiff, bool(wCur.inlineDiff, DEFAULT_FEATURES.workbench.inlineDiff)),
+      fullTextSearch: bool(wSrc.fullTextSearch, bool(wCur.fullTextSearch, DEFAULT_FEATURES.workbench.fullTextSearch)),
+      compactLayout: bool(wSrc.compactLayout, bool(wCur.compactLayout, DEFAULT_FEATURES.workbench.compactLayout)),
+      thoughtTranslate: sanitizeEnum(wSrc.thoughtTranslate, VALID_THOUGHT_TRANSLATE, sanitizeEnum(wCur.thoughtTranslate, VALID_THOUGHT_TRANSLATE, DEFAULT_FEATURES.workbench.thoughtTranslate)),
+      thoughtView: sanitizeEnum(wSrc.thoughtView, VALID_THOUGHT_VIEW, sanitizeEnum(wCur.thoughtView, VALID_THOUGHT_VIEW, DEFAULT_FEATURES.workbench.thoughtView)),
+      thoughtEndpoint:
+        "thoughtEndpoint" in wSrc
+          ? sanitizeLineString(wSrc.thoughtEndpoint, 1024, "")
+          : sanitizeLineString(wCur.thoughtEndpoint, 1024, ""),
+      thoughtModel:
+        "thoughtModel" in wSrc
+          ? sanitizeLineString(wSrc.thoughtModel, 256, "")
+          : sanitizeLineString(wCur.thoughtModel, 256, ""),
+      thoughtApiKey:
+        "thoughtApiKey" in wSrc
+          ? sanitizeLineString(wSrc.thoughtApiKey, 512, "")
+          : sanitizeLineString(wCur.thoughtApiKey, 512, ""),
+    },
+  };
+}
+
 function cloneSettings(data) {
   return {
     ...data,
@@ -158,7 +333,24 @@ function cloneSettings(data) {
       colors: { ...data.font.colors },
       colorsDark: { ...data.font.colorsDark },
     },
+    features: {
+      telemetry: { ...data.features.telemetry },
+      effortSlider: { ...data.features.effortSlider },
+      composerBeam: { ...data.features.composerBeam },
+      embeddedPet: { ...data.features.embeddedPet },
+      motionFx: { ...data.features.motionFx },
+      i18n: { ...data.features.i18n },
+      workbench: { ...data.features.workbench },
+    },
   };
+}
+
+function redactSettings(data) {
+  const cloned = cloneSettings(data);
+  if (cloned.features?.workbench) {
+    cloned.features.workbench.thoughtApiKey = "";
+  }
+  return cloned;
 }
 
 class DreamSkinSettings {
@@ -179,6 +371,7 @@ class DreamSkinSettings {
       fit: ["cover", "contain", "adaptive"].includes(raw.fit) ? raw.fit : "adaptive",
       scrim: finite(raw.scrim, 12, 0, 60),
       opacity: finite(raw.opacity, 55, 0, 100),
+      wallpaperId: sanitizeLineString(raw.wallpaperId, 128, DEFAULT_SETTINGS.wallpaperId) || DEFAULT_SETTINGS.wallpaperId,
       mediaType: VALID_MEDIA_TYPES.has(raw.mediaType) ? raw.mediaType : "preset",
       customMediaPath: sanitizePath(raw.customMediaPath),
       recentMedia: sanitizeRecentMedia(raw.recentMedia),
@@ -190,10 +383,11 @@ class DreamSkinSettings {
         const w = Math.round(finite(raw.chatWidth, 0, 0, 100));
         return w === 0 ? 0 : Math.max(45, w);
       })(),
-      widgetAutoLaunch: bool(raw.widgetAutoLaunch, true),
+      widgetAutoLaunch: bool(raw.widgetAutoLaunch, false),
       widgetHideTray: bool(raw.widgetHideTray, true),
       glass: sanitizeGlass(raw.glass, DEFAULT_GLASS),
       font: sanitizeFont(raw.font, DEFAULT_FONT),
+      features: sanitizeFeatures(raw.features, DEFAULT_FEATURES),
       protectEditor: true,
       protectTerminal: true,
     };
@@ -232,11 +426,28 @@ class DreamSkinSettings {
         )
       : this.data.font;
 
+    const mergedFeatures =
+      patch.features && typeof patch.features === "object"
+        ? sanitizeFeatures(
+            Object.fromEntries(
+              FEATURE_KEYS.map((k) => [
+                k,
+                {
+                  ...this.data.features[k],
+                  ...(patch.features[k] && typeof patch.features[k] === "object" ? patch.features[k] : {}),
+                },
+              ])
+            ),
+            this.data.features
+          )
+        : this.data.features;
+
     this.data = this.sanitize({
       ...this.data,
       ...patch,
       glass: mergedGlass,
       font: mergedFont,
+      features: mergedFeatures,
     });
     writeJson(this.filePath, this.data);
     return this.getAll();
@@ -249,6 +460,10 @@ class DreamSkinSettings {
   getAll() {
     return cloneSettings(this.data);
   }
+
+  exportSanitized() {
+    return redactSettings(this.data);
+  }
 }
 
 module.exports = {
@@ -256,7 +471,11 @@ module.exports = {
   DEFAULT_SETTINGS,
   DEFAULT_GLASS,
   DEFAULT_FONT,
+  DEFAULT_FEATURES,
   GLASS_REGION_KEYS,
   FONT_ROLE_KEYS,
+  FEATURE_KEYS,
   sanitizeHexColor,
+  sanitizeFeatures,
+  redactSettings,
 };

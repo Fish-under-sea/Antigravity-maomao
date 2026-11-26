@@ -31,7 +31,7 @@
   ];
 
   const ACCENT_PRESETS = [
-    ["", "官方默认", "#6366f1"],
+    ["", "官方默认", "#7c6cf6"],
     ["#2563eb", "晴空蓝"],
     ["#0d9488", "松石青"],
     ["#16a34a", "翡翠绿"],
@@ -49,18 +49,28 @@
 
   const el = {
     errorBanner: $("errorBanner"),
+    toastBanner: $("toastBanner"),
     cdpWarnBanner: $("cdpWarnBanner"),
     btnRelaunchHost: $("btnRelaunchHost"),
+    btnRelaunchHostEnh: $("btnRelaunchHostEnh"),
     hostDot: $("hostDot"),
     hostStatusLabel: $("hostStatusLabel"),
     hostStatusDetail: $("hostStatusDetail"),
-    widgetDot: $("widgetDot"),
-    widgetStatusLabel: $("widgetStatusLabel"),
+    petDot: $("petDot"),
+    petStatusLabel: $("petStatusLabel"),
+    pluginVersionPill: $("pluginVersionPill"),
+    pluginVersionText: $("pluginVersionText"),
+    updateBadgeDot: $("updateBadgeDot"),
+    activeModulesSummary: $("activeModulesSummary"),
+    btnExportConfig: $("btnExportConfig"),
+    btnImportConfig: $("btnImportConfig"),
+    inputImportConfig: $("inputImportConfig"),
     chkSkinEnabled: $("chkSkinEnabled"),
     btnRefresh: $("btnRefresh"),
     tabs: Array.from(document.querySelectorAll("[data-tab]")),
     panels: Array.from(document.querySelectorAll("[data-panel]")),
 
+    // Tab 1: 壁纸
     activeMediaName: $("activeMediaName"),
     activeMediaBadge: $("activeMediaBadge"),
     btnPickMedia: $("btnPickMedia"),
@@ -80,9 +90,6 @@
     previewScrim: $("previewScrim"),
     outputModeBtns: Array.from(document.querySelectorAll("[data-output-mode]")),
     fitBtns: Array.from(document.querySelectorAll("[data-fit]")),
-    chatWidthBtns: Array.from(document.querySelectorAll("[data-chat-width]")),
-    rngChatWidth: $("rngChatWidth"),
-    valChatWidth: $("valChatWidth"),
     rngOpacity: $("rngOpacity"),
     valOpacity: $("valOpacity"),
     rngZoom: $("rngZoom"),
@@ -91,6 +98,7 @@
     valScrim: $("valScrim"),
     btnResetCamera: $("btnResetCamera"),
 
+    // Tab 2: 玻璃与字体
     themeStyleBtns: Array.from(document.querySelectorAll("[data-theme-style]")),
     glassPresetBtns: Array.from(document.querySelectorAll("[data-glass-preset]")),
     glassColorPick: $("glassColorPick"),
@@ -99,27 +107,67 @@
     valGlassVeil: $("valGlassVeil"),
     rngGlassRadius: $("rngGlassRadius"),
     valGlassRadius: $("valGlassRadius"),
-
+    chatWidthBtns: Array.from(document.querySelectorAll("[data-chat-width]")),
+    rngChatWidth: $("rngChatWidth"),
+    valChatWidth: $("valChatWidth"),
     fontAccentPick: $("fontAccentPick"),
     fontDarkBtns: Array.from(document.querySelectorAll("[data-dark-sep]")),
     fontRoleList: $("fontRoleList"),
 
-    widgetPathDesc: $("widgetPathDesc"),
-    widgetTag: $("widgetTag"),
-    btnWidgetRecall: $("btnWidgetRecall"),
-    btnWidgetRestart: $("btnWidgetRestart"),
-    btnWidgetQuit: $("btnWidgetQuit"),
-    chkWidgetHideTray: $("chkWidgetHideTray"),
-    chkWidgetAutoLaunch: $("chkWidgetAutoLaunch"),
-    widgetCheckboxes: Array.from(document.querySelectorAll("[data-wkey]")),
-    rngWidgetScale: $("rngWidgetScale"),
-    valWidgetScale: $("valWidgetScale"),
-    btnDockLeft: $("btnDockLeft"),
-    btnDockRight: $("btnDockRight"),
-    btnDockReset: $("btnDockReset"),
-    selWidgetSoundSet: $("selWidgetSoundSet"),
-    rngWidgetVolume: $("rngWidgetVolume"),
-    valWidgetVolume: $("valWidgetVolume"),
+    // Tab 3: 遥测
+    usageSummarySub: $("usageSummarySub"),
+    usageRangeBtns: Array.from(document.querySelectorAll("[data-usage-range]")),
+    kpiTotalTokens: $("kpiTotalTokens"),
+    kpiCacheHit: $("kpiCacheHit"),
+    kpiRequests: $("kpiRequests"),
+    kpiCacheSize: $("kpiCacheSize"),
+    btnRefreshUsage: $("btnRefreshUsage"),
+
+    // Tab 4: 猫宠
+    embeddedPetBadge: $("embeddedPetBadge"),
+    btnPokePet: $("btnPokePet"),
+    rngPetScale: $("rngPetScale"),
+    valPetScale: $("valPetScale"),
+    rngPetOpacity: $("rngPetOpacity"),
+    valPetOpacity: $("valPetOpacity"),
+    selPetSoundPack: $("selPetSoundPack"),
+    rngPetVolume: $("rngPetVolume"),
+    valPetVolume: $("valPetVolume"),
+
+    // Tab 5: 增强与系统维护
+    thoughtConfigWrap: $("thoughtConfigWrap"),
+    thoughtOpenaiFields: $("thoughtOpenaiFields"),
+    inputThoughtEndpoint: $("inputThoughtEndpoint"),
+    inputThoughtModel: $("inputThoughtModel"),
+    inputThoughtApiKey: $("inputThoughtApiKey"),
+    btnSaveThoughtCfg: $("btnSaveThoughtCfg"),
+    debugPortStatus: $("debugPortStatus"),
+    btnEnsureDebugPort: $("btnEnsureDebugPort"),
+    archiveSummary: $("archiveSummary"),
+    btnScanArchive: $("btnScanArchive"),
+    btnRunArchive: $("btnRunArchive"),
+    archiveBatchList: $("archiveBatchList"),
+    selGomemlimit: $("selGomemlimit"),
+    gomemlimitStatus: $("gomemlimitStatus"),
+    btnApplyGomemlimit: $("btnApplyGomemlimit"),
+    legacyWidgetBox: $("legacyWidgetBox"),
+    btnStopLegacyWidget: $("btnStopLegacyWidget"),
+    agyVersionLabel: $("agyVersionLabel"),
+    i18nOverrideLabel: $("i18nOverrideLabel"),
+    btnReloadI18n: $("btnReloadI18n"),
+    btnSyncReloadI18n: $("btnSyncReloadI18n"),
+    pluginUpdateCard: $("pluginUpdateCard"),
+    updateCurVer: $("updateCurVer"),
+    updateStatusText: $("updateStatusText"),
+    btnCheckUpdate: $("btnCheckUpdate"),
+    btnApplyUpdate: $("btnApplyUpdate"),
+    updateNotesBox: $("updateNotesBox"),
+    updateNotesText: $("updateNotesText"),
+    updateReleaseLink: $("updateReleaseLink"),
+
+    // 通用特性开关按钮与分段选项
+    featureToggles: Array.from(document.querySelectorAll("button.toggle-btn[data-fkey]")),
+    featureOptionBtns: Array.from(document.querySelectorAll("[data-fopt]")),
   };
 
   let latestState = null;
@@ -128,7 +176,11 @@
   let loadedImgSrc = "";
   let fontPicker = null;
   let debounceTimer = null;
+  let toastTimer = null;
   let isInteracting = false;
+  let currentTab = "wallpaper";
+  let currentUsageRange = "today";
+  let scannedArchivableIds = [];
 
   function setError(message) {
     if (!message) {
@@ -138,6 +190,34 @@
     }
     el.errorBanner.textContent = message;
     el.errorBanner.classList.remove("hidden");
+  }
+
+  function showToast(message) {
+    if (!el.toastBanner) return;
+    clearTimeout(toastTimer);
+    el.toastBanner.textContent = message;
+    el.toastBanner.classList.remove("hidden");
+    toastTimer = setTimeout(() => {
+      el.toastBanner.classList.add("hidden");
+    }, 3200);
+  }
+
+  function formatCompactNumber(num) {
+    const n = Number(num || 0);
+    if (!Number.isFinite(n)) return "0";
+    if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
+    if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
+    if (n >= 1e3) return (n / 1e3).toFixed(1) + "K";
+    return String(Math.round(n));
+  }
+
+  function formatBytes(bytes) {
+    const n = Number(bytes || 0);
+    if (!Number.isFinite(n) || n <= 0) return "0 B";
+    if (n >= 1024 * 1024 * 1024) return (n / (1024 * 1024 * 1024)).toFixed(2) + " GB";
+    if (n >= 1024 * 1024) return (n / (1024 * 1024)).toFixed(1) + " MB";
+    if (n >= 1024) return (n / 1024).toFixed(0) + " KB";
+    return n + " B";
   }
 
   async function apiFetch(routePath, init = {}) {
@@ -169,6 +249,25 @@
     return parsed;
   }
 
+  function setSwitchState(btn, checked) {
+    if (!btn) return;
+    btn.setAttribute("aria-checked", checked ? "true" : "false");
+  }
+
+  function isSwitchChecked(btn) {
+    return btn?.getAttribute("aria-checked") === "true";
+  }
+
+  function getFeaturePath(features, dotted) {
+    const [section, key] = dotted.split(".");
+    return features?.[section]?.[key];
+  }
+
+  function buildFeaturePatch(dotted, value) {
+    const [section, key] = dotted.split(".");
+    return { features: { [section]: { [key]: value } } };
+  }
+
   function scheduleSave(patch) {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
@@ -186,27 +285,95 @@
     }
   }
 
-  async function saveWidgetSettings(patch) {
-    try {
-      setError("");
-      const next = await requestJson("/api/widget-settings", "POST", patch);
-      renderState(next);
-    } catch (error) {
-      setError(error.message);
+  function switchTab(target) {
+    closeFontPicker();
+    currentTab = target;
+    for (const t of el.tabs) {
+      const active = t.dataset.tab === target;
+      t.classList.toggle("active", active);
+      t.setAttribute("aria-selected", String(active));
+    }
+    for (const p of el.panels) {
+      p.classList.toggle("hidden", p.dataset.panel !== target);
+    }
+    if (target === "telemetry") {
+      loadUsageCard().catch(() => {});
+    } else if (target === "enhance") {
+      loadSystemMaint().catch(() => {});
     }
   }
 
-  // ── 面板自身实时同步用户的玻璃与字体颜色 ──
-  function syncPanelOwnTheme(s) {
+  // ── 四表面态精准检测（dark / light / glass-dark / glass-light）与主题同步 ──
+  function parseColorLuminance(raw) {
+    if (typeof raw !== "string") return null;
+    const str = raw.trim().toLowerCase();
+    if (!str || str === "transparent" || str === "none") return null;
+    let r = 0, g = 0, b = 0, a = 1;
+    const hex6 = /^#([0-9a-f]{6})$/.exec(str);
+    const hex3 = /^#([0-9a-f]{3})$/.exec(str);
+    const rgb = /^rgba?\(\s*([\d.]+)\s*[,\s]\s*([\d.]+)\s*[,\s]\s*([\d.]+)(?:\s*[,/]\s*([\d.]+%?))?\s*\)$/.exec(str);
+    if (hex6) {
+      const n = parseInt(hex6[1], 16);
+      r = (n >> 16) & 255; g = (n >> 8) & 255; b = n & 255;
+    } else if (hex3) {
+      r = parseInt(hex3[1][0] + hex3[1][0], 16);
+      g = parseInt(hex3[1][1] + hex3[1][1], 16);
+      b = parseInt(hex3[1][2] + hex3[1][2], 16);
+    } else if (rgb) {
+      r = Number(rgb[1]); g = Number(rgb[2]); b = Number(rgb[3]);
+      if (rgb[4] !== undefined) {
+        a = rgb[4].endsWith("%") ? parseFloat(rgb[4]) / 100 : Number(rgb[4]);
+      }
+    } else {
+      return null;
+    }
+    if (!Number.isFinite(a) || a < 0.2) return null;
+    return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  }
+
+  function detectPanelDark(state) {
+    if (typeof state?.hostDark === "boolean") return state.hostDark;
+    const docEl = document.documentElement;
+    const attrTheme = (docEl.dataset.theme || docEl.getAttribute("data-theme") || "").toLowerCase();
+    if (attrTheme === "dark") return true;
+    if (attrTheme === "light") return false;
+    if (docEl.classList.contains("dark") || document.body?.classList?.contains("dark")) return true;
+    if (docEl.classList.contains("light") || document.body?.classList?.contains("light")) return false;
+    try {
+      const cs = getComputedStyle(docEl);
+      const bgLum = parseColorLuminance(cs.getPropertyValue("--background"));
+      if (bgLum !== null) return bgLum <= 0.52;
+      const fgLum = parseColorLuminance(cs.getPropertyValue("--foreground"));
+      if (fgLum !== null) return fgLum >= 0.48;
+    } catch {}
+    try {
+      if (window.matchMedia) return window.matchMedia("(prefers-color-scheme: dark)").matches;
+    } catch {}
+    return true;
+  }
+
+  function resolveSurfaceMode(state) {
+    const isDark = detectPanelDark(state);
+    const isGlass = Boolean(state?.settings?.enabled);
+    if (isGlass) return { isDark, isGlass, surface: isDark ? "glass-dark" : "glass-light" };
+    return { isDark, isGlass, surface: isDark ? "dark" : "light" };
+  }
+
+  function syncPanelOwnTheme(s, state = latestState) {
     const rs = document.documentElement.style;
     const g = s.glass || {};
     const regions = g.regions || {};
     const themeStyle = g.themeStyle === "official" ? "official" : "star-neko";
+    const { isDark, surface } = resolveSurfaceMode(state || { settings: s });
     document.documentElement.dataset.ssThemeStyle = themeStyle;
+    document.documentElement.dataset.ssSurface = surface;
+    document.documentElement.dataset.ssPolarity = isDark ? "dark" : "light";
+    rs.colorScheme = isDark ? "dark" : "light";
+
     const rawRadius = Number(g.radius);
     const radius = Number.isFinite(rawRadius) ? Math.min(24, Math.max(8, Math.round(rawRadius))) : 16;
     rs.setProperty("--ss-radius", radius + "px");
-    rs.setProperty("--ss-glass-tint", g.tint || "#ffffff");
+    rs.setProperty("--ss-glass-tint", g.tint || (isDark ? "#ffffff" : "#f8fafc"));
     if (regions.content) {
       rs.setProperty("--ss-glass-content-fill", Math.max(18, regions.content.fill) + "%");
       rs.setProperty("--ss-glass-content-blur", regions.content.blur + "px");
@@ -217,20 +384,20 @@
     }
 
     const f = s.font || {};
-    const darkPalette = f.darkSeparate ? { ...(f.colors || {}), ...(f.colorsDark || {}) } : (f.colors || {});
+    const activePalette = isDark && f.darkSeparate ? { ...(f.colors || {}), ...(f.colorsDark || {}) } : (f.colors || {});
     if (f.accent) rs.setProperty("--ss-accent", f.accent);
     else rs.removeProperty("--ss-accent");
-    if (darkPalette.main) rs.setProperty("--ss-fg", darkPalette.main);
+    if (activePalette.main) rs.setProperty("--ss-fg", activePalette.main);
     else rs.removeProperty("--ss-fg");
-    if (darkPalette.secondary) rs.setProperty("--ss-fg-2", darkPalette.secondary);
+    if (activePalette.secondary) rs.setProperty("--ss-fg-2", activePalette.secondary);
     else rs.removeProperty("--ss-fg-2");
-    if (darkPalette.muted) rs.setProperty("--ss-muted", darkPalette.muted);
+    if (activePalette.muted) rs.setProperty("--ss-muted", activePalette.muted);
     else rs.removeProperty("--ss-muted");
-    if (darkPalette.faint) rs.setProperty("--ss-faint", darkPalette.faint);
+    if (activePalette.faint) rs.setProperty("--ss-faint", activePalette.faint);
     else rs.removeProperty("--ss-faint");
   }
 
-  // ── 图三同款 HSV 颜色计算与可拖拽取色器 ──
+  // ── HSV 颜色计算与可拖拽取色器 ──
   function hexToRgb(hex) {
     const m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
     if (!m) return [255, 255, 255];
@@ -371,7 +538,7 @@
     if (isVideo) {
       el.previewImg.classList.add("hidden");
       el.previewVideo.classList.remove("hidden");
-      // Keep preview frozen at a poster frame so we never decode two 4K streams simultaneously
+      // 预览窗仅定格首帧，避免与宿主并发解码两路 4K 视频流
       el.previewVideo.autoplay = false;
       el.previewVideo.loop = false;
       el.previewVideo.muted = true;
@@ -482,7 +649,6 @@
       btn.classList.toggle("active", btn.dataset.glassPreset === curPreset);
     }
 
-    // 玻璃颜色色点 + 自定义取色器
     const curTint = (g.tint || "").toLowerCase();
     el.glassColorPick.replaceChildren();
     for (const [hex, title] of GLASS_COLORS) {
@@ -522,7 +688,6 @@
     });
     el.glassColorPick.append(sw, hexCode, resetBtn);
 
-    // 6 区域滑块
     if (!isInteracting) {
       el.glassRegionList.replaceChildren();
       for (const [key, label] of GLASS_REGIONS) {
@@ -646,7 +811,7 @@
     customDot.style.setProperty("--fc", curAccent || "transparent");
     customDot.title = "自定义强调色";
     customDot.addEventListener("click", () => {
-      openFontPicker(customDot, curAccent || "#6366f1", (out) => {
+      openFontPicker(customDot, curAccent || "#7c6cf6", (out) => {
         customDot.style.setProperty("--fc", out || "transparent");
         customDot.classList.toggle("empty", !out);
         scheduleSave({ font: { accent: out } });
@@ -675,53 +840,148 @@
     }
   }
 
-  function renderWidgetControls(state) {
-    const s = state.settings;
-    const widget = state.widget || {};
-    const ws = state.widgetSettings || {};
+  function renderFeatureControls(state) {
+    const s = state.settings || {};
+    const f = s.features || {};
+    const pet = f.embeddedPet || {};
+    const wb = f.workbench || {};
+    const i18n = f.i18n || {};
+    const tel = f.telemetry || {};
 
-    el.chkWidgetHideTray.checked = s.widgetHideTray !== false;
-    el.chkWidgetAutoLaunch.checked = s.widgetAutoLaunch !== false;
+    // Header running module pills
+    const pills = [
+      ["壁纸", Boolean(s.enabled)],
+      ["遥测", Boolean(tel.enabled && tel.barMode !== "off")],
+      ["猫宠", Boolean(pet.enabled)],
+      ["汉化", i18n.mode !== "off"],
+      ["工作台", Boolean(wb.codeFold || wb.contextMenu || wb.inlineDiff || wb.fullTextSearch)],
+    ];
+    el.activeModulesSummary.replaceChildren();
+    for (const [label, active] of pills) {
+      const span = document.createElement("span");
+      span.className = "ss-mod-pill" + (active ? " on" : "");
+      span.textContent = label;
+      el.activeModulesSummary.appendChild(span);
+    }
 
-    if (!widget.available) {
-      el.widgetDot.className = "ss-dot warn";
-      el.widgetStatusLabel.textContent = "未安装";
-      el.widgetTag.textContent = "未找到 EXE";
-      el.widgetPathDesc.textContent = "未找到 StarWidget.exe，请先安装星语桌宠挂件";
-    } else if (widget.running) {
-      el.widgetDot.className = "ss-dot ok";
-      el.widgetStatusLabel.textContent = "桌宠运行中";
-      el.widgetTag.textContent = s.widgetHideTray !== false ? "插件内托管" : "托盘+插件";
-      el.widgetPathDesc.textContent = widget.path || "已在宿主内受控运行";
+    // Pet status indicator
+    if (pet.enabled) {
+      el.petDot.className = "ss-dot ok";
+      el.petStatusLabel.textContent = "猫宠内置";
+      el.embeddedPetBadge.textContent = "已内置运行";
+      el.embeddedPetBadge.className = "ss-tag ss-tag-ok";
     } else {
-      el.widgetDot.className = "ss-dot";
-      el.widgetStatusLabel.textContent = "桌宠已停";
-      el.widgetTag.textContent = "已停止";
-      el.widgetPathDesc.textContent = widget.path || "点击唤起即可启动桌宠";
+      el.petDot.className = "ss-dot";
+      el.petStatusLabel.textContent = "猫宠已关";
+      el.embeddedPetBadge.textContent = "已关闭";
+      el.embeddedPetBadge.className = "ss-tag";
     }
 
-    el.btnWidgetRecall.disabled = !widget.available;
-    el.btnWidgetRestart.disabled = !widget.available;
-    el.btnWidgetQuit.disabled = !widget.running;
-
-    for (const chk of el.widgetCheckboxes) {
-      const key = chk.dataset.wkey;
-      chk.checked = Boolean(ws[key]);
-      if (key === "alwaysOnTop") chk.disabled = Boolean(ws.hostWindowOnly);
+    // Feature toggle switch buttons
+    for (const btn of el.featureToggles) {
+      setSwitchState(btn, Boolean(getFeaturePath(f, btn.dataset.fkey)));
     }
 
-    const scale = Number(ws.scale || 220);
+    // Option pills / segmented controls
+    for (const btn of el.featureOptionBtns) {
+      const cur = getFeaturePath(f, btn.dataset.fopt);
+      btn.classList.toggle("active", String(cur ?? "") === String(btn.dataset.val));
+    }
+
+    // Embedded pet sliders & select
+    const scale = Number(pet.scale ?? 100);
+    const opacity = Number(pet.opacity ?? 100);
+    const volume = Number(pet.volume ?? 60);
     if (!isInteracting) {
-      el.rngWidgetScale.value = String(scale);
+      el.rngPetScale.value = String(scale);
+      el.rngPetOpacity.value = String(opacity);
+      el.rngPetVolume.value = String(volume);
     }
-    el.valWidgetScale.textContent = Math.round(scale) + "px";
+    el.valPetScale.textContent = Math.round(scale) + "%";
+    el.valPetOpacity.textContent = Math.round(opacity) + "%";
+    el.valPetVolume.textContent = Math.round(volume) + "%";
+    if (pet.soundPack && el.selPetSoundPack.value !== pet.soundPack) {
+      el.selPetSoundPack.value = pet.soundPack;
+    }
 
-    if (ws.soundSet) el.selWidgetSoundSet.value = ws.soundSet;
-    const vol = Math.round(Number(ws.volume ?? 0.35) * 100);
-    if (!isInteracting) {
-      el.rngWidgetVolume.value = String(vol);
+    // Thought translate sub-fields
+    const ttMode = wb.thoughtTranslate || "off";
+    el.thoughtConfigWrap.classList.toggle("hidden", ttMode === "off");
+    el.thoughtOpenaiFields.classList.toggle("hidden", ttMode !== "openai");
+    if (document.activeElement !== el.inputThoughtEndpoint) {
+      el.inputThoughtEndpoint.value = wb.thoughtEndpoint || "";
     }
-    el.valWidgetVolume.textContent = vol + "%";
+    if (document.activeElement !== el.inputThoughtModel) {
+      el.inputThoughtModel.value = wb.thoughtModel || "";
+    }
+    if (document.activeElement !== el.inputThoughtApiKey) {
+      el.inputThoughtApiKey.value = wb.thoughtApiKey || "";
+    }
+
+    // Legacy standalone StarWidget process detection
+    const legacyRunning = Boolean(state.widget?.running);
+    el.legacyWidgetBox.classList.toggle("hidden", !legacyRunning);
+
+    // AGY version linkage & i18n reload info
+    const verStr = state.pluginVersion ? `v${String(state.pluginVersion).replace(/^v/i, "")}` : "v0.4.0";
+    if (el.pluginVersionText) el.pluginVersionText.textContent = verStr;
+    if (el.updateCurVer) el.updateCurVer.textContent = verStr;
+
+    const agyVer = state.agyVersion || (state.status?.connected ? "已连接（未上报版本串）" : "等待连接 Antigravity");
+    const reloadTime = state.lastI18nReloadAt ? ` · 上次重载 ${new Date(state.lastI18nReloadAt).toLocaleTimeString()}` : "";
+    if (el.agyVersionLabel) {
+      el.agyVersionLabel.textContent = `AGY 版本：${agyVer}${reloadTime}`;
+    }
+    if (el.i18nOverrideLabel) {
+      const ovCount = Number(state.i18nOverrideCount || 0);
+      const upText = state.lastAgyUpgradeReloadAt
+        ? ` · 已响应 AGY 升级自动重载 (${new Date(state.lastAgyUpgradeReloadAt).toLocaleTimeString()})`
+        : " · AGY 升级自动重载汉化";
+      el.i18nOverrideLabel.textContent = `本地覆盖词条：${ovCount} 条${upText}`;
+    }
+
+    renderUpdateStatus(state.updateStatus);
+  }
+
+  function renderUpdateStatus(up) {
+    if (!up || !el.updateStatusText) return;
+    const hasUpdate = Boolean(up.hasUpdate && up.downloadUrl);
+    el.updateBadgeDot?.classList.toggle("hidden", !hasUpdate);
+    el.btnApplyUpdate?.classList.toggle("hidden", !hasUpdate);
+    if (el.btnApplyUpdate) {
+      el.btnApplyUpdate.disabled = Boolean(up.updating);
+      el.btnApplyUpdate.textContent = up.updating ? "更新安装中…" : `一键更新至 v${String(up.latestVersion || "").replace(/^v/i, "")}`;
+    }
+    if (el.btnCheckUpdate) {
+      el.btnCheckUpdate.disabled = Boolean(up.checking || up.updating);
+    }
+    if (up.error) {
+      el.updateStatusText.textContent = `检查/更新提示：${up.error}`;
+    } else if (up.appliedVersion) {
+      el.updateStatusText.textContent = `已安装 v${String(up.appliedVersion).replace(/^v/i, "")}，正在平滑重载侧边栏…`;
+    } else if (hasUpdate) {
+      const sizeStr = up.assetSize ? ` (${formatBytes(up.assetSize)})` : "";
+      el.updateStatusText.textContent = `发现新版本 v${String(up.latestVersion).replace(/^v/i, "")}${sizeStr}，点击右侧一键更新并重载`;
+    } else if (up.checkedAt) {
+      el.updateStatusText.textContent = `已是最新版本（检测于 ${new Date(up.checkedAt).toLocaleTimeString()}）`;
+    }
+
+    const notes = typeof up.releaseNotes === "string" ? up.releaseNotes.trim() : "";
+    const relUrl = typeof up.releaseUrl === "string" && /^https:\/\/github\.com\//i.test(up.releaseUrl) ? up.releaseUrl : "";
+    if (el.updateNotesBox) {
+      el.updateNotesBox.classList.toggle("hidden", !notes && !relUrl);
+    }
+    if (el.updateNotesText) {
+      el.updateNotesText.textContent = notes || (relUrl ? "点击下方链接查看本版本详细更新日志。" : "");
+    }
+    if (el.updateReleaseLink) {
+      if (relUrl) {
+        el.updateReleaseLink.href = relUrl;
+        el.updateReleaseLink.classList.remove("hidden");
+      } else {
+        el.updateReleaseLink.classList.add("hidden");
+      }
+    }
   }
 
   function renderState(state) {
@@ -729,12 +989,11 @@
     const s = state.settings;
     const media = state.activeMedia || {};
     const host = state.status || {};
-    const widget = state.widget || {};
 
-    syncPanelOwnTheme(s);
-    setError(state.wallpaperError || widget.error || "");
+    syncPanelOwnTheme(s, state);
+    setError(state.wallpaperError || "");
 
-    el.chkSkinEnabled.checked = Boolean(s.enabled);
+    setSwitchState(el.chkSkinEnabled, Boolean(s.enabled));
     if (host.applied) {
       el.hostDot.className = "ss-dot ok";
       el.hostStatusLabel.textContent = "皮肤已生效";
@@ -767,8 +1026,8 @@
 
     const showVideo = s.mediaType === "video" || media.mediaKind === "video";
     el.videoControls.classList.toggle("hidden", !showVideo);
-    el.chkVideoMuted.checked = s.videoMuted !== false;
-    el.chkVideoSmoothMode.checked = s.videoSmoothMode !== false;
+    setSwitchState(el.chkVideoMuted, s.videoMuted !== false);
+    setSwitchState(el.chkVideoSmoothMode, s.videoSmoothMode !== false);
     el.btnVideoPause.textContent = s.videoPaused ? "继续" : "暂停";
     el.selPlaybackRate.value = String(s.videoPlaybackRate ?? 1);
 
@@ -792,7 +1051,91 @@
     updatePreviewMedia(state);
     renderGlassControls(s);
     renderFontControls(s);
-    renderWidgetControls(state);
+    renderFeatureControls(state);
+  }
+
+  // ── 遥测轻量用量卡加载 ──
+  async function loadUsageCard() {
+    try {
+      const data = await requestJson(`/api/maomao/usage?range=${encodeURIComponent(currentUsageRange)}`, "GET");
+      el.kpiTotalTokens.textContent = formatCompactNumber(data.totalTokens || 0);
+      el.kpiCacheHit.textContent =
+        typeof data.cacheHitPercent === "number" ? `${Math.round(data.cacheHitPercent)}%` : "—";
+      const reqCount = Number(data.totalRequests || 0);
+      const anomalyCount = Array.isArray(data.cacheAnomalies) ? data.cacheAnomalies.length : 0;
+      el.kpiRequests.textContent = anomalyCount > 0 ? `${reqCount} / ${anomalyCount}⚠` : String(reqCount);
+      el.kpiCacheSize.textContent = formatBytes(data.cacheStats?.totalBytes || data.cacheSizeBytes || 0);
+
+      const costText = typeof data.costUsd === "number" && data.costUsd > 0 ? `参考估值 $${data.costUsd.toFixed(2)}` : "本机只读遥测";
+      el.usageSummarySub.textContent = `${costText} · ${data.cacheStats?.fileCount || 0} 个轨迹文件`;
+    } catch {
+      el.usageSummarySub.textContent = "遥测服务暂未就绪，等待会话数据…";
+    }
+  }
+
+  // ── 系统维护状态加载 ──
+  async function loadSystemMaint() {
+    try {
+      const [sys, batches] = await Promise.all([
+        requestJson("/api/maomao/system/status", "GET"),
+        requestJson("/api/maomao/archive/batches", "GET"),
+      ]);
+      if (sys?.debugPort) {
+        const dp = sys.debugPort;
+        const sc = dp.shortcuts || {};
+        el.debugPortStatus.textContent = dp.ready
+          ? `调试端口已就绪 (:${dp.port}) · 快捷方式 ${sc.configured || 0}/${sc.total || 0}`
+          : sc.total
+            ? `调试端口未连接 · 快捷方式 ${sc.configured || 0}/${sc.total || 0} 已含调试参数`
+            : "暂未检测到活动调试端口，点击修复快捷方式或调试重启";
+      }
+      if (sys?.gomemlimit) {
+        const curVal = sys.gomemlimit.value || "";
+        el.selGomemlimit.value = curVal;
+        el.gomemlimitStatus.textContent = curVal
+          ? `当前已设置 GOMEMLIMIT=${curVal}（重启 Antigravity 生效）`
+          : "当前未限制（使用 Go 默认策略）";
+      }
+      renderArchiveBatches(batches?.batches || []);
+    } catch {}
+  }
+
+  function renderArchiveBatches(batches) {
+    el.archiveBatchList.replaceChildren();
+    if (!Array.isArray(batches) || !batches.length) {
+      el.archiveBatchList.classList.add("hidden");
+      return;
+    }
+    el.archiveBatchList.classList.remove("hidden");
+    for (const b of batches.slice(0, 6)) {
+      const item = document.createElement("div");
+      item.className = "ss-batch-item";
+      const info = document.createElement("span");
+      const count = b.itemCount ?? b.count ?? 0;
+      const statusText = b.restorable === false ? "（已还原）" : "";
+      info.textContent = `${b.batchId} · ${count} 个会话 (${formatBytes(b.totalBytes || 0)})${statusText}`;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "ss-btn ss-btn-sm";
+      btn.textContent = b.restorable === false ? "已还原" : "还原";
+      btn.disabled = b.restorable === false;
+      btn.addEventListener("click", async () => {
+        try {
+          setError("");
+          const res = await requestJson("/api/maomao/archive/restore", "POST", { batchId: b.batchId });
+          if (res.ok === false) {
+            setError(res.message || res.error || "还原失败");
+          } else {
+            showToast(res.message || `已无损还原批次 ${b.batchId}`);
+            loadSystemMaint();
+          }
+        } catch (err) {
+          setError(err.message);
+        }
+      });
+      item.append(info, btn);
+      el.archiveBatchList.appendChild(item);
+    }
   }
 
   async function fetchState() {
@@ -804,52 +1147,89 @@
     }
   }
 
-  // ── 事件绑定 ──
+  // ── 通用事件绑定 ──
   for (const tab of el.tabs) {
-    tab.addEventListener("click", () => {
-      closeFontPicker();
-      const target = tab.dataset.tab;
-      for (const t of el.tabs) {
-        const active = t.dataset.tab === target;
-        t.classList.toggle("active", active);
-        t.setAttribute("aria-selected", String(active));
-      }
-      for (const p of el.panels) {
-        p.classList.toggle("hidden", p.dataset.panel !== target);
-      }
-    });
+    tab.addEventListener("click", () => switchTab(tab.dataset.tab));
   }
 
   el.btnRefresh.addEventListener("click", async () => {
     try {
       setError("");
       renderState(await requestJson("/api/refresh", "POST", {}));
+      if (currentTab === "telemetry") loadUsageCard();
+      if (currentTab === "enhance") loadSystemMaint();
     } catch (error) {
       setError(error.message);
     }
   });
 
-  if (el.btnRelaunchHost) {
-    el.btnRelaunchHost.addEventListener("click", async () => {
-      el.btnRelaunchHost.disabled = true;
-      el.btnRelaunchHost.textContent = "正在重启…";
+  // 导出/导入脱敏 JSON 配置
+  el.btnExportConfig.addEventListener("click", async () => {
+    try {
+      setError("");
+      const data = await requestJson("/api/maomao/config/export", "GET");
+      const blob = new Blob([JSON.stringify(data, null, 2) + "\n"], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "miaoyan-settings.json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      showToast("已导出脱敏 JSON 配置（API Key 已清除）");
+    } catch (error) {
+      setError(error.message);
+    }
+  });
+
+  el.btnImportConfig.addEventListener("click", () => el.inputImportConfig.click());
+  el.inputImportConfig.addEventListener("change", async () => {
+    const file = el.inputImportConfig.files?.[0];
+    el.inputImportConfig.value = "";
+    if (!file) return;
+    try {
+      setError("");
+      const raw = await file.text();
+      const parsed = JSON.parse(raw);
+      const payload = parsed?.settings && typeof parsed.settings === "object" ? parsed.settings : parsed;
+      const next = await requestJson("/api/settings", "POST", payload);
+      renderState(next);
+      showToast("配置导入成功并已生效");
+    } catch (error) {
+      setError("导入配置失败：" + error.message);
+    }
+  });
+
+  const bindRelaunch = (btn) => {
+    if (!btn) return;
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      const oldText = btn.textContent;
+      btn.textContent = "正在重启…";
       try {
         setError("");
         const res = await requestJson("/api/relaunch-host", "POST", {});
         if (res && res.ok === false) {
           setError(res.error || "重启失败");
-          el.btnRelaunchHost.disabled = false;
-          el.btnRelaunchHost.textContent = "一键调试重启";
+          btn.disabled = false;
+          btn.textContent = oldText;
         }
       } catch (error) {
         setError(error.message);
-        el.btnRelaunchHost.disabled = false;
-        el.btnRelaunchHost.textContent = "一键调试重启";
+        btn.disabled = false;
+        btn.textContent = oldText;
       }
     });
-  }
+  };
+  bindRelaunch(el.btnRelaunchHost);
+  bindRelaunch(el.btnRelaunchHostEnh);
 
-  el.chkSkinEnabled.addEventListener("change", () => saveSettings({ enabled: el.chkSkinEnabled.checked }));
+  el.chkSkinEnabled.addEventListener("click", () => {
+    const next = !isSwitchChecked(el.chkSkinEnabled);
+    setSwitchState(el.chkSkinEnabled, next);
+    saveSettings({ enabled: next });
+  });
 
   for (const btn of el.outputModeBtns) {
     btn.addEventListener("click", () => saveSettings({ outputMode: btn.dataset.outputMode }));
@@ -892,8 +1272,16 @@
     }
   });
 
-  el.chkVideoMuted.addEventListener("change", () => saveSettings({ videoMuted: el.chkVideoMuted.checked }));
-  el.chkVideoSmoothMode.addEventListener("change", () => saveSettings({ videoSmoothMode: el.chkVideoSmoothMode.checked }));
+  el.chkVideoMuted.addEventListener("click", () => {
+    const next = !isSwitchChecked(el.chkVideoMuted);
+    setSwitchState(el.chkVideoMuted, next);
+    saveSettings({ videoMuted: next });
+  });
+  el.chkVideoSmoothMode.addEventListener("click", () => {
+    const next = !isSwitchChecked(el.chkVideoSmoothMode);
+    setSwitchState(el.chkVideoSmoothMode, next);
+    saveSettings({ videoSmoothMode: next });
+  });
   el.btnVideoPause.addEventListener("click", () => saveSettings({ videoPaused: !latestState?.settings?.videoPaused }));
   el.selPlaybackRate.addEventListener("change", () => saveSettings({ videoPlaybackRate: Number(el.selPlaybackRate.value) }));
   el.btnResetCamera.addEventListener("click", () => saveSettings({ positionX: 50, positionY: 50, zoom: 1 }));
@@ -903,8 +1291,7 @@
   }
   el.rngChatWidth.addEventListener("pointerdown", () => { isInteracting = true; });
   el.rngChatWidth.addEventListener("input", () => {
-    const v = Math.round(Number(el.rngChatWidth.value));
-    el.valChatWidth.textContent = v + "%";
+    el.valChatWidth.textContent = Math.round(Number(el.rngChatWidth.value)) + "%";
   });
   el.rngChatWidth.addEventListener("change", () => {
     isInteracting = false;
@@ -932,9 +1319,7 @@
   }
 
   for (const btn of el.themeStyleBtns) {
-    btn.addEventListener("click", () => {
-      saveSettings({ glass: { themeStyle: btn.dataset.themeStyle } });
-    });
+    btn.addEventListener("click", () => saveSettings({ glass: { themeStyle: btn.dataset.themeStyle } }));
   }
 
   for (const btn of el.glassPresetBtns) {
@@ -976,60 +1361,218 @@
     });
   }
 
-  el.chkWidgetHideTray.addEventListener("change", async () => {
-    const res = await requestJson("/api/widget", "POST", { action: "hideTray", value: el.chkWidgetHideTray.checked });
-    if (res.state) renderState(res.state);
-  });
-
-  el.chkWidgetAutoLaunch.addEventListener("change", async () => {
-    const res = await requestJson("/api/widget", "POST", { action: "autoLaunch", value: el.chkWidgetAutoLaunch.checked });
-    if (res.state) renderState(res.state);
-  });
-
-  for (const [btn, action] of [
-    [el.btnWidgetRecall, "recall"],
-    [el.btnWidgetRestart, "restart"],
-    [el.btnWidgetQuit, "quit"],
-    [el.btnDockLeft, "dock-left"],
-    [el.btnDockRight, "dock-right"],
-    [el.btnDockReset, "reset-pos"],
-  ]) {
-    btn.addEventListener("click", async () => {
-      try {
-        setError("");
-        const res = await requestJson("/api/widget", "POST", { action });
-        if (res.state) renderState(res.state);
-        setTimeout(fetchState, 900);
-      } catch (error) {
-        setError(error.message);
-      }
+  // 通用特性开关按钮与选项绑定
+  for (const btn of el.featureToggles) {
+    btn.addEventListener("click", () => {
+      const next = !isSwitchChecked(btn);
+      setSwitchState(btn, next);
+      saveSettings(buildFeaturePatch(btn.dataset.fkey, next));
+    });
+  }
+  for (const btn of el.featureOptionBtns) {
+    btn.addEventListener("click", () => {
+      saveSettings(buildFeaturePatch(btn.dataset.fopt, btn.dataset.val));
     });
   }
 
-  for (const chk of el.widgetCheckboxes) {
-    chk.addEventListener("change", () => saveWidgetSettings({ [chk.dataset.wkey]: chk.checked }));
+  // Tab 3: 遥测按钮
+  for (const btn of el.usageRangeBtns) {
+    btn.addEventListener("click", () => {
+      currentUsageRange = btn.dataset.usageRange;
+      for (const b of el.usageRangeBtns) b.classList.toggle("active", b === btn);
+      loadUsageCard();
+    });
+  }
+  el.btnRefreshUsage.addEventListener("click", () => loadUsageCard());
+
+  // Tab 4: 内置猫宠滑块与测试按钮
+  for (const [input, out, key] of [
+    [el.rngPetScale, el.valPetScale, "scale"],
+    [el.rngPetOpacity, el.valPetOpacity, "opacity"],
+    [el.rngPetVolume, el.valPetVolume, "volume"],
+  ]) {
+    input.addEventListener("pointerdown", () => { isInteracting = true; });
+    input.addEventListener("input", () => {
+      out.textContent = input.value + "%";
+    });
+    input.addEventListener("change", () => {
+      isInteracting = false;
+      saveSettings({ features: { embeddedPet: { [key]: Number(input.value) } } });
+    });
   }
 
-  el.rngWidgetScale.addEventListener("pointerdown", () => { isInteracting = true; });
-  el.rngWidgetScale.addEventListener("input", () => {
-    el.valWidgetScale.textContent = el.rngWidgetScale.value + "px";
-  });
-  el.rngWidgetScale.addEventListener("change", () => {
-    isInteracting = false;
-    saveWidgetSettings({ scale: Number(el.rngWidgetScale.value) });
+  el.selPetSoundPack.addEventListener("change", () => {
+    saveSettings({ features: { embeddedPet: { soundPack: el.selPetSoundPack.value } } });
   });
 
-  el.selWidgetSoundSet.addEventListener("change", () => saveWidgetSettings({ soundSet: el.selWidgetSoundSet.value }));
-
-  el.rngWidgetVolume.addEventListener("pointerdown", () => { isInteracting = true; });
-  el.rngWidgetVolume.addEventListener("input", () => {
-    el.valWidgetVolume.textContent = el.rngWidgetVolume.value + "%";
+  el.btnPokePet.addEventListener("click", async () => {
+    try {
+      setError("");
+      const res = await requestJson("/api/maomao/pet-poke", "POST", { kind: "petting" });
+      if (res.ok) showToast(res.line ? `猫猫说：「${res.line}」` : "已戳一下内置猫娘～");
+      else setError(res.error || "内置猫娘尚未挂载到宿主窗口");
+    } catch (err) {
+      setError(err.message);
+    }
   });
-  el.rngWidgetVolume.addEventListener("change", () => {
-    isInteracting = false;
-    saveWidgetSettings({ volume: Number(el.rngWidgetVolume.value) / 100 });
+
+  // Tab 5: 思考翻译保存 & 系统维护
+  el.btnSaveThoughtCfg.addEventListener("click", () => {
+    saveSettings({
+      features: {
+        workbench: {
+          thoughtEndpoint: el.inputThoughtEndpoint.value.trim(),
+          thoughtModel: el.inputThoughtModel.value.trim(),
+          thoughtApiKey: el.inputThoughtApiKey.value.trim(),
+        },
+      },
+    });
+    showToast("思考翻译端点配置已保存");
   });
 
+  el.btnEnsureDebugPort.addEventListener("click", async () => {
+    try {
+      setError("");
+      const res = await requestJson("/api/maomao/system/ensure-debug-port", "POST", {});
+      el.debugPortStatus.textContent = res.message || (res.ok ? "快捷方式已修复" : "修复未完成");
+      if (res.ok) showToast("快捷方式调试参数校验/修复完成");
+      else setError(res.error || res.message || "快捷方式修复失败");
+    } catch (err) {
+      setError(err.message);
+    }
+  });
+
+  el.btnScanArchive.addEventListener("click", async () => {
+    try {
+      setError("");
+      const res = await requestJson("/api/maomao/archive/scan", "GET");
+      const items = Array.isArray(res.items) ? res.items : [];
+      scannedArchivableIds = items.map((x) => x.id).filter(Boolean);
+      el.btnRunArchive.disabled = scannedArchivableIds.length === 0;
+      el.archiveSummary.textContent = scannedArchivableIds.length
+        ? `发现 ${scannedArchivableIds.length} 个隐藏子代理轨迹（约 ${formatBytes(res.totalBytes || 0)}），点击右侧无损归档`
+        : "当前没有需要归档的隐藏子代理轨迹";
+    } catch (err) {
+      setError(err.message);
+    }
+  });
+
+  el.btnRunArchive.addEventListener("click", async () => {
+    if (!scannedArchivableIds.length) return;
+    try {
+      setError("");
+      const res = await requestJson("/api/maomao/archive/run", "POST", { ids: scannedArchivableIds });
+      if (res.ok === false) {
+        setError(res.message || res.error || "归档被阻止");
+      } else {
+        scannedArchivableIds = [];
+        el.btnRunArchive.disabled = true;
+        showToast(res.message || `已无损归档 ${res.archivedCount || 0} 个子代理轨迹`);
+        loadSystemMaint();
+      }
+    } catch (err) {
+      setError(err.message);
+    }
+  });
+
+  el.btnApplyGomemlimit.addEventListener("click", async () => {
+    try {
+      setError("");
+      const res = await requestJson("/api/maomao/system/gomemlimit", "POST", {
+        preset: el.selGomemlimit.value,
+      });
+      if (res.ok === false) setError(res.error || "设置失败");
+      else {
+        showToast(res.message || "GOMEMLIMIT 设置已更新");
+        loadSystemMaint();
+      }
+    } catch (err) {
+      setError(err.message);
+    }
+  });
+
+  el.btnStopLegacyWidget.addEventListener("click", async () => {
+    try {
+      setError("");
+      const res = await requestJson("/api/widget", "POST", { action: "quit" });
+      if (res.state) renderState(res.state);
+      showToast("已发送关闭遗留独立挂件信号");
+      setTimeout(fetchState, 900);
+    } catch (err) {
+      setError(err.message);
+    }
+  });
+
+  el.pluginVersionPill?.addEventListener("click", () => {
+    switchTab("enhance");
+    el.pluginUpdateCard?.scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+
+  const runI18nReload = async (syncRemote) => {
+    const btn = syncRemote ? el.btnSyncReloadI18n : el.btnReloadI18n;
+    const oldText = btn?.textContent || "";
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = syncRemote ? "同步重载中…" : "重载中…";
+    }
+    try {
+      setError("");
+      const res = await requestJson("/api/i18n/reload", "POST", { syncRemote, forceReinject: false });
+      if (res.state) renderState(res.state);
+      const swInfo = res.swarmFramesReloaded ? `，Swarm 面板 ${res.swarmFramesReloaded} 个` : "";
+      showToast(`汉化重载完成（覆盖词条 ${res.overrideCount || 0} 条${swInfo}）`);
+    } catch (err) {
+      setError("汉化重载失败：" + err.message);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = oldText;
+      }
+    }
+  };
+  el.btnReloadI18n?.addEventListener("click", () => runI18nReload(false));
+  el.btnSyncReloadI18n?.addEventListener("click", () => runI18nReload(true));
+
+  el.btnCheckUpdate?.addEventListener("click", async () => {
+    el.btnCheckUpdate.disabled = true;
+    const oldText = el.btnCheckUpdate.textContent;
+    el.btnCheckUpdate.textContent = "检测中…";
+    try {
+      setError("");
+      const res = await requestJson("/api/update/check?force=1", "GET");
+      renderUpdateStatus(res);
+      if (res.ok && res.hasUpdate) showToast(`发现新版本 v${String(res.latestVersion).replace(/^v/i, "")}`);
+      else if (res.ok) showToast("当前已是最新版本");
+      else setError(res.error || "检查更新失败");
+    } catch (err) {
+      setError("检查更新失败：" + err.message);
+    } finally {
+      el.btnCheckUpdate.disabled = false;
+      el.btnCheckUpdate.textContent = oldText;
+    }
+  });
+
+  el.btnApplyUpdate?.addEventListener("click", async () => {
+    el.btnApplyUpdate.disabled = true;
+    el.btnApplyUpdate.textContent = "下载安装中…";
+    try {
+      setError("");
+      const res = await requestJson("/api/update/apply", "POST", {});
+      if (res.updateStatus) renderUpdateStatus(res.updateStatus);
+      if (res.ok === false) {
+        setError(res.error || "更新失败");
+      } else {
+        showToast(`更新至 v${String(res.toVersion || "").replace(/^v/i, "")} 成功，正在自动重载插件…`);
+        setTimeout(fetchState, 2200);
+      }
+    } catch (err) {
+      setError("更新失败：" + err.message);
+    } finally {
+      el.btnApplyUpdate.disabled = false;
+    }
+  });
+
+  // 预览图焦点拖拽
   el.previewStage.addEventListener("pointerdown", (event) => {
     if (!latestState) return;
     isInteracting = true;
@@ -1066,11 +1609,34 @@
   el.previewStage.addEventListener("pointerup", endDrag);
   el.previewStage.addEventListener("pointercancel", endDrag);
 
+  // 实时响应宿主 theme-change postMessage 与系统亮暗切换
+  const resyncSurface = () => {
+    if (latestState?.settings) syncPanelOwnTheme(latestState.settings, latestState);
+    else syncPanelOwnTheme({}, null);
+  };
+  window.addEventListener("message", (event) => {
+    if (event.data?.type === "theme-change") {
+      setTimeout(resyncSurface, 0);
+    }
+  });
+  try {
+    const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
+    mq?.addEventListener?.("change", resyncSurface);
+  } catch {}
+  try {
+    const themeObs = new MutationObserver(resyncSurface);
+    themeObs.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-theme"] });
+  } catch {}
+
+  resyncSurface();
   fetchState();
   window.addEventListener("focus", () => {
     if (!dragging && !isInteracting) fetchState();
   });
   setInterval(() => {
-    if (!document.hidden && !dragging && !isInteracting) fetchState();
+    if (!document.hidden && !dragging && !isInteracting) {
+      fetchState();
+      if (currentTab === "telemetry") loadUsageCard();
+    }
   }, 4000);
 })();

@@ -1,8 +1,8 @@
 {
   "name": "antigravity-star-suite",
-  "display_name": "猫猫壁纸&喵言喵语",
-  "description": "Antigravity 专属猫猫壁纸（动态 MP4 视频 / 自定义图片液态玻璃皮肤）与喵言喵语猫娘桌宠托管，零补丁升级不掉。",
-  "version": "0.3.9",
+  "display_name": "喵言喵语",
+  "description": "Antigravity 专属一体化增强插件：4K60 动态壁纸与液态玻璃皮肤、内置猫娘桌宠与光学动效、512K 物理试管遥测、星空推理滑块、全界面汉化（保留模型名与思考强度原英文）及工作台效率套件。",
+  "version": "0.4.0",
   "author": "Fish-under-sea",
   "repository": {
     "type": "git",

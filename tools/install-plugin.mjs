@@ -22,7 +22,7 @@ const PLUGIN_FILES = [
   "sidecars/star-suite/web/logo.png",
 ];
 
-const SKIN_RUNTIME_FILES = [
+const SKIN_REQUIRED_FILES = [
   "src/domain/settings.cjs",
   "src/domain/theme-loader.cjs",
   "src/domain/host-controller.cjs",
@@ -32,13 +32,17 @@ const SKIN_RUNTIME_FILES = [
   "assets/wallpapers/gemini-character-sheet-v1/wallpaper.png",
 ];
 
-const WIDGET_RUNTIME_FILES = ["src/domain/settings.cjs"];
+const WIDGET_RUNTIME_FILES = [
+  "src/domain/settings.cjs",
+  "src/adapters/host-quota.cjs",
+];
 
 function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
 }
 
 function collectFilesRecursive(dirPath, baseDir = dirPath, acc = []) {
+  if (!fs.existsSync(dirPath)) return acc;
   for (const entry of fs.readdirSync(dirPath, { withFileTypes: true })) {
     const full = path.join(dirPath, entry.name);
     if (entry.isDirectory()) {
@@ -48,6 +52,17 @@ function collectFilesRecursive(dirPath, baseDir = dirPath, acc = []) {
     }
   }
   return acc;
+}
+
+function collectDirFiles(dirPath, extFilter = null) {
+  if (!fs.existsSync(dirPath)) return [];
+  const out = [];
+  for (const entry of fs.readdirSync(dirPath, { withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    if (extFilter && !extFilter.has(path.extname(entry.name).toLowerCase())) continue;
+    out.push(entry.name);
+  }
+  return out.sort();
 }
 
 function copyFileClean(src, dst) {
@@ -80,33 +95,76 @@ export function installStarSuitePlugin(options = {}) {
   const stagedRuntimeRoot = path.join(targetDir, "sidecars", "star-suite", "runtime");
 
   const plannedCopies = [];
+  const seenDst = new Set();
+  const addCopy = (src, dst) => {
+    const key = process.platform === "win32" ? dst.toLowerCase() : dst;
+    if (seenDst.has(key)) return;
+    seenDst.add(key);
+    plannedCopies.push({ src, dst });
+  };
 
   for (const rel of PLUGIN_FILES) {
-    plannedCopies.push({
-      src: path.join(pluginSrcDir, rel),
-      dst: path.join(targetDir, rel),
-    });
+    addCopy(path.join(pluginSrcDir, rel), path.join(targetDir, rel));
   }
 
   for (const rel of collectFilesRecursive(sharedSrcDir)) {
-    plannedCopies.push({
-      src: path.join(sharedSrcDir, rel),
-      dst: path.join(stagedRuntimeRoot, "shared", rel),
-    });
+    addCopy(path.join(sharedSrcDir, rel), path.join(stagedRuntimeRoot, "shared", rel));
   }
 
-  for (const rel of SKIN_RUNTIME_FILES) {
-    plannedCopies.push({
-      src: path.join(skinSrcDir, rel),
-      dst: path.join(stagedRuntimeRoot, "Antigravity-Dream-Skin", rel),
-    });
+  // Required Dream-Skin core files
+  for (const rel of SKIN_REQUIRED_FILES) {
+    addCopy(path.join(skinSrcDir, rel), path.join(stagedRuntimeRoot, "Antigravity-Dream-Skin", rel));
   }
 
+  // Dynamically include all domain/*.cjs (protobuf, telemetry-db, quota-bridge, etc.)
+  const domainDir = path.join(skinSrcDir, "src", "domain");
+  for (const name of collectDirFiles(domainDir, new Set([".cjs"]))) {
+    addCopy(
+      path.join(domainDir, name),
+      path.join(stagedRuntimeRoot, "Antigravity-Dream-Skin", "src", "domain", name)
+    );
+  }
+
+  // Dynamically include all host/modules/*.cjs (vial-physics, telemetry-bar, effort-slider, composer-beam, embedded-pet, motion-fx, i18n-dict, host-i18n, workbench-enhancer, etc.)
+  const hostModulesDir = path.join(skinSrcDir, "src", "host", "modules");
+  for (const name of collectDirFiles(hostModulesDir, new Set([".cjs"]))) {
+    addCopy(
+      path.join(hostModulesDir, name),
+      path.join(stagedRuntimeRoot, "Antigravity-Dream-Skin", "src", "host", "modules", name)
+    );
+  }
+
+  // Bundle built-in Cat Pet static assets into self-contained runtime/Antigravity-Dream-Skin/assets/cat-pet/*
+  const petFramesSrc = path.join(widgetSrcDir, "assets", "character-packs", "gemini-star-v1", "frames");
+  for (const name of collectDirFiles(petFramesSrc, new Set([".png", ".webp", ".gif", ".svg"]))) {
+    addCopy(
+      path.join(petFramesSrc, name),
+      path.join(stagedRuntimeRoot, "Antigravity-Dream-Skin", "assets", "cat-pet", "frames", name)
+    );
+  }
+
+  const petAudioSrc = path.join(widgetSrcDir, "assets", "audio", "codex-maid-widget", "files");
+  for (const name of collectDirFiles(petAudioSrc, new Set([".wav", ".mp3", ".ogg"]))) {
+    addCopy(
+      path.join(petAudioSrc, name),
+      path.join(stagedRuntimeRoot, "Antigravity-Dream-Skin", "assets", "cat-pet", "audio", name)
+    );
+  }
+
+  const petDialogueSrc = path.join(widgetSrcDir, "assets", "dialogue", "zh-CN.json");
+  if (fs.existsSync(petDialogueSrc)) {
+    addCopy(
+      petDialogueSrc,
+      path.join(stagedRuntimeRoot, "Antigravity-Dream-Skin", "assets", "cat-pet", "dialogue", "zh-CN.json")
+    );
+  }
+
+  // Legacy widget settings & quota adapter compatibility
   for (const rel of WIDGET_RUNTIME_FILES) {
-    plannedCopies.push({
-      src: path.join(widgetSrcDir, rel),
-      dst: path.join(stagedRuntimeRoot, "Antigravity-Cat-Widget", rel),
-    });
+    const src = path.join(widgetSrcDir, rel);
+    if (fs.existsSync(src)) {
+      addCopy(src, path.join(stagedRuntimeRoot, "Antigravity-Cat-Widget", rel));
+    }
   }
 
   if (!dryRun) {

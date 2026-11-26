@@ -4,16 +4,16 @@
     "main.mjs"
   ],
   "restart_policy": "always",
-  "display_name": "猫猫壁纸&喵言喵语",
-  "description": "猫猫动态壁纸与液态玻璃皮肤（支持本地 MP4 视频与自定义图片，兼顾喵言喵语猫娘桌宠托管）",
+  "display_name": "喵言喵语",
+  "description": "Antigravity 专属动态壁纸、液态玻璃皮肤、内置猫娘桌宠、512K 物理试管遥测、全界面汉化与工作台效率套件",
   "has_web_ui": true,
   "ui_config": {
-    "display_name": "猫猫壁纸&喵言喵语",
+    "display_name": "喵言喵语",
     "views": [
       {
         "path": "/",
         "entrypoint": "SIDECAR_UI_ENTRYPOINT_AUX_PANE",
-        "title": "猫猫壁纸&喵言喵语"
+        "title": "喵言喵语"
       }
     ]
   }

@@ -19,13 +19,61 @@ export function resolveSuiteRoot(baseDir = __dirname) {
   return { root: path.resolve(baseDir, "../../.."), staged: false };
 }
 
+export function readPluginVersion(baseDir = __dirname) {
+  const candidates = [
+    path.resolve(baseDir, "../../plugin.json"),
+    path.resolve(baseDir, "../../../Antigravity-Plugin/plugin.json"),
+  ];
+  for (const file of candidates) {
+    try {
+      if (!fs.existsSync(file)) continue;
+      const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
+      if (parsed && typeof parsed.version === "string" && parsed.version.trim()) {
+        return parsed.version.trim();
+      }
+    } catch {}
+  }
+  return "0.4.0";
+}
+
+function tryRequire(filePath) {
+  if (!fs.existsSync(filePath)) return null;
+  try {
+    return require(filePath);
+  } catch (error) {
+    console.warn(`[star-suite] optional module load failed (${path.basename(filePath)}):`, error.message);
+    return null;
+  }
+}
+
+export function resolveCatPetAssetDirs(root, skinRoot) {
+  const stagedFrames = path.join(skinRoot, "assets", "cat-pet", "frames");
+  const stagedAudio = path.join(skinRoot, "assets", "cat-pet", "audio");
+  const stagedDialogue = path.join(skinRoot, "assets", "cat-pet", "dialogue");
+
+  const repoFrames = path.join(root, "Antigravity-Cat-Widget", "assets", "character-packs", "gemini-star-v1", "frames");
+  const repoAudio = path.join(root, "Antigravity-Cat-Widget", "assets", "audio", "codex-maid-widget", "files");
+  const repoDialogue = path.join(root, "Antigravity-Cat-Widget", "assets", "dialogue");
+
+  return {
+    pet: fs.existsSync(stagedFrames) ? stagedFrames : repoFrames,
+    audio: fs.existsSync(stagedAudio) ? stagedAudio : repoAudio,
+    dialogue: fs.existsSync(stagedDialogue) ? stagedDialogue : repoDialogue,
+  };
+}
+
 export function loadDreamSkinModules(baseDir = __dirname) {
   const { root, staged } = resolveSuiteRoot(baseDir);
   const skinRoot = path.join(root, "Antigravity-Dream-Skin");
   const widgetSettingsModPath = path.join(root, "Antigravity-Cat-Widget/src/domain/settings.cjs");
-  const { DreamSkinSettings, DEFAULT_SETTINGS, DEFAULT_GLASS, DEFAULT_FONT } = require(
-    path.join(skinRoot, "src/domain/settings.cjs")
-  );
+  const {
+    DreamSkinSettings,
+    DEFAULT_SETTINGS,
+    DEFAULT_GLASS,
+    DEFAULT_FONT,
+    DEFAULT_FEATURES,
+    redactSettings,
+  } = require(path.join(skinRoot, "src/domain/settings.cjs"));
   const { DreamSkinThemeLoader } = require(
     path.join(skinRoot, "src/domain/theme-loader.cjs")
   );
@@ -37,6 +85,10 @@ export function loadDreamSkinModules(baseDir = __dirname) {
     detectMediaKind,
     mimeTypeForPath,
   } = require(path.join(skinRoot, "src/domain/media-server.cjs"));
+
+  const telemetryDb = tryRequire(path.join(skinRoot, "src/domain/telemetry-db.cjs"));
+  const quotaBridge = tryRequire(path.join(skinRoot, "src/domain/quota-bridge.cjs"));
+  const pluginUpdater = tryRequire(path.join(skinRoot, "src/domain/plugin-updater.cjs"));
 
   let WidgetSettingsManager = null;
   let DEFAULT_WIDGET_SETTINGS = null;
@@ -52,15 +104,22 @@ export function loadDreamSkinModules(baseDir = __dirname) {
     root,
     skinRoot,
     staged,
+    pluginVersion: readPluginVersion(baseDir),
+    catPetAssetDirs: resolveCatPetAssetDirs(root, skinRoot),
     DreamSkinSettings,
     DEFAULT_SETTINGS,
     DEFAULT_GLASS,
     DEFAULT_FONT,
+    DEFAULT_FEATURES,
+    redactSettings,
     DreamSkinThemeLoader,
     HostController,
     LocalMediaServer,
     detectMediaKind,
     mimeTypeForPath,
+    telemetryDb,
+    quotaBridge,
+    pluginUpdater,
     WidgetSettingsManager,
     DEFAULT_WIDGET_SETTINGS,
     ALLOWED_SOUND_SETS,

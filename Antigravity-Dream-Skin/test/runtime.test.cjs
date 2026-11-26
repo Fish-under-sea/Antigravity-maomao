@@ -33,7 +33,7 @@ function fixture(){
     const payload=JSON.parse(expression.slice(expression.lastIndexOf(")({")+2,-1));
     applied.push(payload);
     if(blockApply){const gate=blockApply;blockApply=null;await gate;}
-    state={themed:true,owner:payload.owner,rev:25};
+    state={themed:true,owner:payload.owner,rev:27};
     return {applied:true};
    }
    if(expression.includes("touch?.()")){
@@ -488,7 +488,7 @@ test('DreamSkinSettings sanitizes videoSmoothMode and chatWidth, and HostControl
 
  let patched=null;
  let applyCount=0;
- let state={ready:'complete',themed:true,owner:'drag-owner',rev:25,stale:false,chatWidth:91};
+ let state={ready:'complete',themed:true,owner:'drag-owner',rev:27,stale:false,chatWidth:91};
  const client={
   closed:false,
   async evaluate(expression){
@@ -580,8 +580,10 @@ test('installTheme REV 10 eliminates black fades, slims scrollbars, optimizes 4K
   });
   const baseCss=headEl.children.find(c=>c.id==='agy-dream-style-v2')?.textContent||'';
   const tokenCss=headEl.children.find(c=>c.id==='agy-dream-tokens-v2')?.textContent||'';
-  assert.equal(global.window.__agyDreamSkinV2.rev,25);
-  assert.match(baseCss,/\[data-testid="aux-pane-split"\]\s*>\s*div:last-child::after[\s\S]*backdrop-filter:\s*blur\(38px\)/);
+  assert.equal(global.window.__agyDreamSkinV2.rev,27);
+  assert.match(baseCss,/\[data-testid="aux-pane-split"\]\s*>\s*div:last-child::before/);
+  assert.doesNotMatch(baseCss,/\[data-testid="aux-pane-split"\]\s*>\s*div:last-child::after/);
+  assert.match(baseCss,/data-agy-smooth-video="1"[\s\S]*backdrop-filter:\s*blur\(12px\)/);
   assert.doesNotMatch(baseCss,/\[data-testid="sidecar-iframe-slot"\]:has\([^)]*\)::(before|after)/);
   assert.match(baseCss,/\[data-select-popup\]/);
   assert.match(baseCss,/:not\(\.toast-root\):not\(\.toast-viewport \*\)/);
@@ -646,7 +648,7 @@ test('HostController upgrades legacy rev 9 plugin owner while still leaving unre
    if(expression.startsWith('(async function installTheme')){
     const payload=JSON.parse(expression.slice(expression.lastIndexOf(')({')+2,-1));
     applied.push(payload);
-    state={themed:true,owner:payload.owner,rev:25};
+    state={themed:true,owner:payload.owner,rev:27};
     return {applied:true};
    }
    if(expression.includes('destroy()')){destroys++;state={themed:false};return null;}
@@ -671,7 +673,7 @@ test('HostController styles third-party plugin iframes (e.g. Swarm) with short-l
  const frameOps=[];
  let frameCloseCount=0;
  let mainApplyCount=0;
- let mainState={ready:'complete',themed:true,mediaHealthy:true,mediaSrc:'http://127.0.0.1:1/media?v=1',owner:'swarm-test',rev:25,stale:false};
+ let mainState={ready:'complete',themed:true,mediaHealthy:true,mediaSrc:'http://127.0.0.1:1/media?v=1',owner:'swarm-test',rev:27,stale:false};
  const mainClient={
   closed:false,
   async evaluate(expression){
@@ -746,14 +748,614 @@ test('HostController styles third-party plugin iframes (e.g. Swarm) with short-l
   const applied=installPluginFrameTheme({owner:'o1',glass:{themeStyle:'star-neko',radius:16,regions:{content:{fill:60},header:{fill:84}}}});
   assert.equal(applied.applied,true);
   const css=head.children[0]?.textContent||'';
-  assert.equal(applied.rev,4);
+  assert.equal(applied.rev,5);
   assert.equal(boardProps['--agy-header-h'],(Math.floor(76.66667*1.5)/1.5)+'px');
   assert.match(css,/\.board:has\(#tab-feed\.active\)\s*\.header\s*\{[\s\S]*border-bottom:\s*0\s*!important/);
   assert.match(css,/#tab-feed\s*>\s*\.toolbar\s*\{[\s\S]*top:\s*var\(--agy-header-h,\s*var\(--header-h,\s*0px\)\)\s*!important[\s\S]*width:\s*100%\s*!important[\s\S]*margin-inline:\s*0\s*!important[\s\S]*padding-inline:\s*var\(--inline\)\s*!important/);
-  assert.match(css,/backdrop-filter:\s*blur\(38px\)/);
+  assert.match(css,/backdrop-filter:\s*blur\(24px\)/);
   global.window.__agyDreamPluginFrameV2.destroy();
   assert.equal(boardProps['--agy-header-h'],undefined);
  }finally{
   global.document=origDoc;global.window=origWin;global.getComputedStyle=origCS;
  }
+});
+
+test('DreamSkinSettings v0.4.0 sanitizes nested features, defaults widgetAutoLaunch false, and redacts API key on export',()=>{
+ const file=path.join(fs.mkdtempSync(path.join(os.tmpdir(),'dream-v040-set-')),'settings.json');
+ const s=new DreamSkinSettings(file);
+ const init=s.getAll();
+ assert.equal(init.widgetAutoLaunch,false);
+ assert.equal(init.features.telemetry.enabled,true);
+ assert.equal(init.features.telemetry.barMode,'auto');
+ assert.equal(init.features.telemetry.vialStyle,'vial');
+ assert.equal(init.features.effortSlider.crystalOrchestrator,true);
+ assert.equal(init.features.composerBeam.enabled,false);
+ assert.equal(init.features.composerBeam.palette,'star-neko');
+ assert.equal(init.features.embeddedPet.enabled,true);
+ assert.equal(init.features.embeddedPet.scale,100);
+ assert.equal(init.features.embeddedPet.dock,'right');
+ assert.equal(init.features.embeddedPet.snap,true);
+ assert.equal(init.features.motionFx.inkStreamFade,true);
+ assert.equal(init.features.motionFx.smoothCaret,false);
+ assert.equal(init.features.i18n.mode,'auto');
+ assert.equal(init.features.i18n.swarmEnabled,true);
+ assert.equal('outlineRail' in init.features.workbench,false);
+ assert.equal(init.features.workbench.thoughtTranslate,'off');
+
+ s.update({
+  features:{
+   telemetry:{barMode:'icons',vialStyle:'bar'},
+   composerBeam:{enabled:true,palette:'aurora',quotaHalo:true},
+   embeddedPet:{scale:240,opacity:10,dock:'left',snap:false,volume:-5,soundPack:'bubble-pop'},
+   i18n:{mode:'on',swarmEnabled:false},
+   workbench:{outlineRail:true,compactLayout:true,thoughtTranslate:'openai',thoughtEndpoint:'https://api.example.com/v1',thoughtApiKey:'sk-secret-123'}
+  }
+ });
+ s.update({features:{embeddedPet:{showBubbles:false}}});
+ const reloaded=new DreamSkinSettings(file);
+ const cfg=reloaded.getAll();
+ assert.equal('outlineRail' in cfg.features.workbench,false);
+ assert.equal(cfg.features.telemetry.barMode,'icons');
+ assert.equal(cfg.features.telemetry.vialStyle,'bar');
+ assert.equal(cfg.features.composerBeam.palette,'aurora');
+ assert.equal(cfg.features.embeddedPet.scale,160);
+ assert.equal(cfg.features.embeddedPet.opacity,20);
+ assert.equal(cfg.features.embeddedPet.dock,'left');
+ assert.equal(cfg.features.embeddedPet.snap,false);
+ assert.equal(cfg.features.embeddedPet.volume,0);
+ assert.equal(cfg.features.embeddedPet.soundPack,'bubble-pop');
+ assert.equal(cfg.features.embeddedPet.showBubbles,false);
+ assert.equal(cfg.features.i18n.mode,'on');
+ assert.equal(cfg.features.i18n.swarmEnabled,false);
+ assert.equal(cfg.features.workbench.thoughtApiKey,'sk-secret-123');
+ const exported=reloaded.exportSanitized();
+ assert.equal(exported.features.workbench.thoughtApiKey,'');
+});
+
+test('LocalMediaServer serves token-protected /asset files and blocks traversal, bad extensions, and non-loopback hosts',async t=>{
+ const {LocalMediaServer}=require('../src/domain/media-server.cjs');
+ const base=fs.mkdtempSync(path.join(os.tmpdir(),'dream-asset-'));
+ const petDir=path.join(base,'frames');
+ const audioDir=path.join(base,'audio');
+ const dlgDir=path.join(base,'dialogue');
+ fs.mkdirSync(petDir,{recursive:true});
+ fs.mkdirSync(audioDir,{recursive:true});
+ fs.mkdirSync(dlgDir,{recursive:true});
+ fs.writeFileSync(path.join(petDir,'idle.png'),Buffer.from([0x89,0x50,0x4e,0x47]));
+ fs.writeFileSync(path.join(audioDir,'original-press.wav'),Buffer.from('RIFF'));
+ fs.writeFileSync(path.join(dlgDir,'zh-CN.json'),'{"ok":true}');
+ fs.writeFileSync(path.join(base,'secret.txt'),'nope');
+
+ const srv=new LocalMediaServer({assetDirs:{pet:petDir,audio:audioDir,dialogue:dlgDir}});
+ await srv.start();
+ t.after(()=>srv.stop());
+
+ const okPng=await fetch(`${srv.assetBaseUrl}pet&file=idle.png`);
+ assert.equal(okPng.status,200);
+ assert.equal(okPng.headers.get('content-type'),'image/png');
+
+ const okWav=await fetch(`${srv.assetBaseUrl}audio&file=original-press.wav`);
+ assert.equal(okWav.status,200);
+ assert.equal(okWav.headers.get('content-type'),'audio/wav');
+
+ const okDlg=await fetch(`${srv.assetBaseUrl}dialogue&file=zh-CN.json`);
+ assert.equal(okDlg.status,200);
+ assert.deepEqual(await okDlg.json(),{ok:true});
+
+ const traversal=await fetch(`${srv.baseUrl}/asset?token=${srv.token}&kind=pet&file=..%2Fsecret.txt`);
+ assert.equal(traversal.status,403);
+ const badKind=await fetch(`${srv.baseUrl}/asset?token=${srv.token}&kind=evil&file=idle.png`);
+ assert.equal(badKind.status,403);
+ const badExt=await fetch(`${srv.baseUrl}/asset?token=${srv.token}&kind=pet&file=zh-CN.json`);
+ assert.equal(badExt.status,403);
+ const noAuth=await fetch(`${srv.baseUrl}/asset?token=wrong&kind=pet&file=idle.png`);
+ assert.equal(noAuth.status,401);
+});
+
+test('HostController injects, hot-updates, and cleans up v0.4.0 feature modules + Swarm i18n without leaking thoughtApiKey',async()=>{
+ const {HOST_MODULE_SPECS}=require('../src/domain/host-controller.cjs');
+ const specRev=(id)=>HOST_MODULE_SPECS.find(s=>s.id===id)?.rev||1;
+ const calls=[];
+ const frameCalls=[];
+ const liveMap={};
+ const fakeModules={
+  telemetryBar:function installTelemetryBar(cfg){return {applied:true,cfg};},
+  effortSlider:function installEffortSlider(cfg){return {applied:true,cfg};},
+  composerBeam:function installComposerBeam(cfg){return {applied:true,cfg};},
+  embeddedPet:function installEmbeddedPet(cfg){return {applied:true,cfg};},
+  motionFx:function installMotionFx(cfg){return {applied:true,cfg};},
+  hostI18n:function installHostI18n(cfg){return {applied:true,cfg};},
+  swarmI18n:function installSwarmI18n(cfg){return {applied:true,cfg};},
+  workbench:function installWorkbenchEnhancer(cfg){return {applied:true,cfg};},
+  revs:{telemetryBar:3,embeddedPet:2,workbench:2,effortSlider:1,composerBeam:1,motionFx:1,hostI18n:1,swarmI18n:1},
+ };
+ const mainClient={
+  closed:false,
+  async evaluate(expr){
+   calls.push(expr);
+   if(expr.startsWith('({ready:'))return {ready:'complete',themed:true,owner:'feat-owner',rev:27,stale:false,mediaHealthy:true};
+   if(expr.startsWith('({telemetryBar:'))return {...liveMap};
+   if(expr.includes('installTelemetryBar')){liveMap.telemetryBar={owner:'feat-owner',rev:3,stale:false};return {applied:true};}
+   if(expr.includes('installEmbeddedPet')){liveMap.embeddedPet={owner:'feat-owner',rev:2,stale:false};return {applied:true};}
+   if(expr.includes('installWorkbenchEnhancer')){liveMap.workbench={owner:'feat-owner',rev:2,stale:false};return {applied:true};}
+   if(expr.includes('triggerQuip'))return {text:'哼，戳到聪明猫猫了。'};
+   if(expr.includes('destroy'))return null;
+   return {applied:true};
+  },
+  close(){this.closed=true;}
+ };
+ assert.ok(specRev('telemetryBar')>=1&&specRev('embeddedPet')>=1&&specRev('workbench')>=1);
+ const frameClient={
+  closed:false,
+  async evaluate(expr){
+   frameCalls.push(expr);
+   return {applied:true};
+  },
+  close(){this.closed=true;}
+ };
+ const hc=new HostController(
+  {payload:cfg=>({...cfg,image:'data:image/png;base64,AA=='})},
+  ()=>{},
+  {
+   owner:'feat-owner',
+   featureModules:fakeModules,
+   sidecar:{baseUrl:'http://127.0.0.1:43210',token:'tok123',assetBaseUrl:'http://127.0.0.1:43210/asset?token=tok123&kind='},
+   discover:async()=>({port:55555,target:{webSocketDebuggerUrl:'ws://127.0.0.1:55555/page/1'}}),
+   listTargets:async()=>[{id:'f-sw',type:'iframe',url:'plugin://swarm--swarm_board-1/?t=1',webSocketDebuggerUrl:'ws://127.0.0.1:55555/frame/sw'}],
+   createClient:u=>u.includes('/frame/sw')?frameClient:mainClient
+  }
+ );
+ await hc.update({
+  enabled:false,
+  features:{
+   telemetry:{enabled:true,barMode:'auto',vialEnabled:true,vialStyle:'vial',quotaEnabled:true},
+   effortSlider:{enabled:false},
+   composerBeam:{enabled:false,quotaHalo:false},
+   embeddedPet:{enabled:true,scale:110,dock:'right',opacity:100,soundEnabled:true,soundPack:'original',volume:60,showBubbles:true,hideWhenZen:true},
+   motionFx:{inkStreamFade:false,semanticAura:false,smoothCaret:false,unreadBadge:false},
+   i18n:{mode:'auto',swarmEnabled:true},
+   workbench:{codeFold:true,thoughtTranslate:'openai',thoughtApiKey:'sk-never-send-to-dom'}
+  }
+ });
+ assert.ok(calls.some(c=>c.includes('installTelemetryBar')&&c.includes('http://127.0.0.1:43210')));
+ assert.ok(calls.some(c=>c.includes('installEmbeddedPet')&&c.includes('/asset?token=tok123&kind=')));
+ const wbCall=calls.find(c=>c.includes('installWorkbenchEnhancer'));
+ assert.ok(wbCall);
+ assert.doesNotMatch(wbCall,/sk-never-send-to-dom/);
+ assert.ok(frameCalls.some(c=>c.includes('installSwarmI18n')));
+
+ // Subsequent tick with matching rev:2 telemetryBar & workbench must ONLY touch(), never re-inject or destroy
+ const beforeTickLen=calls.length;
+ await hc.tick();
+ const afterTickCalls=calls.slice(beforeTickLen);
+ assert.equal(afterTickCalls.some(c=>c.includes('installTelemetryBar')||c.includes('installWorkbenchEnhancer')||(c.includes('__agyMaomao')&&c.includes('destroy'))),false);
+ assert.ok(afterTickCalls.some(c=>c.includes('__agyMaomaoTelemetryBar')&&c.includes('touch?.()')));
+ assert.ok(afterTickCalls.some(c=>c.includes('__agyMaomaoWorkbench')&&c.includes('touch?.()')));
+
+ const poke=await hc.pokeEmbeddedPet('petting');
+ assert.equal(poke.ok,true);
+ assert.match(poke.line,/聪明猫猫/);
+
+ await hc.stop();
+ assert.ok(calls.some(c=>c.includes('__agyMaomaoPet')&&c.includes('destroy')));
+ assert.ok(frameCalls.some(c=>c.includes('__agyMaomaoSwarmI18n')&&c.includes('destroy')));
+});
+
+test('HostController passes hostDark/hostTokens/smoothVideo to Swarm iframe, skips about:blank, backs off stuck OOPIFs (5s->15s->30s), and isolates errors from main skin',async()=>{
+ let nowMs=100000;
+ let mainDestroyed=0;
+ let mainConnects=0;
+ const frameAttempts=[];
+ let failSwarm=true;
+ const mainClient={
+  closed:false,
+  async evaluate(expr){
+   if(expr.startsWith('({ready:')){
+    return {
+     ready:'complete',themed:true,owner:'stab-owner',rev:27,stale:false,mediaHealthy:true,
+     hostDark:true,hostTokens:{'--foreground':'#f3edfc','--border':'rgba(255,255,255,0.12)','--ignored':'bad'}
+    };
+   }
+   if(expr.includes('__agyDreamSkinV2?.destroy')||expr.includes('__agyDreamSkinV2.destroy')){mainDestroyed++;return null;}
+   return {applied:true};
+  },
+  close(){this.closed=true;}
+ };
+ const makeFrameClient=(url)=>({
+  closed:false,
+  async evaluate(expr){
+   frameAttempts.push({t:nowMs,url,expr});
+   if(failSwarm)throw new Error('OOPIF stalled timeout');
+   return {applied:true};
+  },
+  close(){this.closed=true;}
+ });
+ const hc=new HostController(
+  {payload:cfg=>({...cfg,image:'data:image/png;base64,AA=='})},
+  ()=>{},
+  {
+   owner:'stab-owner',
+   now:()=>nowMs,
+   discover:async()=>{mainConnects++;return {port:55555,target:{webSocketDebuggerUrl:'ws://127.0.0.1:55555/page/1'}};},
+   listTargets:async()=>[
+    {id:'f-blank',type:'iframe',url:'about:blank',webSocketDebuggerUrl:'ws://127.0.0.1:55555/frame/blank'},
+    {id:'f-empty',type:'iframe',url:'',webSocketDebuggerUrl:'ws://127.0.0.1:55555/frame/empty'},
+    {id:'f-swarm',type:'iframe',url:'plugin://swarm--swarm_board-1/?t=1',webSocketDebuggerUrl:'ws://127.0.0.1:55555/frame/swarm'}
+   ],
+   createClient:u=>u.includes('/frame/')?makeFrameClient(u):mainClient
+  }
+ );
+ await hc.update({enabled:true,mediaType:'video',videoSmoothMode:true,glass:{themeStyle:'star-neko'}});
+ // 1st failure -> 5s backoff; about:blank & empty skipped completely
+ assert.equal(frameAttempts.length,1);
+ assert.ok(frameAttempts.every(a=>a.url.includes('/frame/swarm')));
+ assert.equal(mainDestroyed,0);
+ assert.equal(mainConnects,1);
+ assert.equal(hc.client,mainClient);
+ assert.equal(hc.frameBackoff.get('f-swarm').delay,5000);
+
+ // 2.5s later -> still inside 5s cooldown, must NOT touch stuck OOPIF
+ nowMs+=2500;
+ await hc.tick();
+ assert.equal(frameAttempts.length,1);
+
+ // At +5s -> 2nd failure -> 15s backoff
+ nowMs+=2500;
+ await hc.tick();
+ assert.equal(frameAttempts.length,2);
+ assert.equal(hc.frameBackoff.get('f-swarm').delay,15000);
+
+ // At +10s -> still in 15s backoff
+ nowMs+=10000;
+ await hc.tick();
+ assert.equal(frameAttempts.length,2);
+
+ // At +15s -> 3rd failure -> 30s backoff
+ nowMs+=5000;
+ await hc.tick();
+ assert.equal(frameAttempts.length,3);
+ assert.equal(hc.frameBackoff.get('f-swarm').delay,30000);
+
+ // At +30s -> Swarm recovers, payload includes hostDark + sanitized hostTokens + smoothVideo, backoff cleared
+ failSwarm=false;
+ nowMs+=30000;
+ await hc.tick();
+ assert.equal(frameAttempts.length,4);
+ assert.equal(hc.frameBackoff.has('f-swarm'),false);
+ const payloadExpr=frameAttempts[3].expr;
+ assert.match(payloadExpr,/"hostDark":true/);
+ assert.match(payloadExpr,/"--foreground":"#f3edfc"/);
+ assert.doesNotMatch(payloadExpr,/--ignored/);
+ assert.match(payloadExpr,/"smoothVideo":true/);
+
+ // Main client never disconnected or destroyed during OOPIF storms
+ assert.equal(mainConnects,1);
+ assert.equal(mainDestroyed,0);
+
+ // Healthy steady-state re-check interval is 15s (not triggered at 10s, triggered at 15s)
+ nowMs+=10000;
+ await hc.tick();
+ assert.equal(frameAttempts.length,4);
+ nowMs+=5000;
+ await hc.tick();
+ assert.equal(frameAttempts.length,5);
+ assert.match(frameAttempts[4].expr,/rev===5/);
+
+ await hc.stop();
+});
+
+test('HostController detects AGY build/version changes across restarts and reloads host + Swarm i18n with override dict',async()=>{
+ const tmpDir=fs.mkdtempSync(path.join(os.tmpdir(),'dream-agy-ver-'));
+ const stateFile=path.join(tmpDir,'host-state.json');
+ fs.writeFileSync(stateFile,JSON.stringify({lastHostBuild:'2.34.0|Electron/44|orig',agyVersion:'2.34.0'}),'utf8');
+
+ const mainOps=[];
+ const swarmOps=[];
+ const mainClient={
+  closed:false,
+  async evaluate(expr){
+   mainOps.push(expr);
+   if(expr.startsWith('({ready:')){
+    return {
+     ready:'complete',themed:false,owner:'',rev:0,stale:false,
+     hostDark:true,hostTokens:{},
+     hostBuild:{agyVersion:'2.35.1',fingerprint:'2.35.1|Electron/45|new-bundle'}
+    };
+   }
+   if(expr.startsWith('({telemetryBar:'))return {hostI18n:{owner:'ver-owner',rev:3,stale:false}};
+   if(expr.includes('__agyMaomaoHostI18n.reload'))return {ok:true,dictSize:42,reloadedAt:Date.now()};
+   return {applied:true,dictSize:42};
+  },
+  close(){this.closed=true;}
+ };
+ const swarmClient={
+  closed:false,
+  async evaluate(expr){
+   swarmOps.push(expr);
+   if(expr.includes('__agyMaomaoSwarmI18n')&&expr.includes('.reload'))return {ok:true,active:true};
+   return {applied:true};
+  },
+  close(){this.closed=true;}
+ };
+ const hc=new HostController(
+  {payload:cfg=>({...cfg,image:'data:image/png;base64,AA=='})},
+  ()=>{},
+  {
+   owner:'ver-owner',
+   hostStateFile:stateFile,
+   getI18nOverrideDict:()=>({'Quick Action':'快捷动作'}),
+   featureModules:{
+    hostI18n:function installHostI18n(cfg){return {applied:true,cfg};},
+    swarmI18n:function installSwarmI18n(cfg){return {applied:true,cfg};},
+    revs:{hostI18n:3,swarmI18n:2}
+   },
+   discover:async()=>({port:55555,target:{webSocketDebuggerUrl:'ws://127.0.0.1:55555/page/1'}}),
+   listTargets:async()=>[{id:'f-sw',type:'iframe',url:'plugin://swarm--board/?t=1',webSocketDebuggerUrl:'ws://127.0.0.1:55555/frame/sw'}],
+   createClient:u=>u.includes('/frame/sw')?swarmClient:mainClient
+  }
+ );
+
+ await hc.update({enabled:false,features:{i18n:{mode:'auto',swarmEnabled:true}}});
+ assert.equal(hc.agyVersion,'2.35.1');
+ assert.ok(hc.lastAgyUpgradeReloadAt>0);
+ assert.ok(mainOps.some(e=>e.includes('installHostI18n')&&e.includes('Quick Action')));
+ assert.ok(swarmOps.some(e=>e.includes('installSwarmI18n')&&e.includes('Quick Action')));
+ const persisted=JSON.parse(fs.readFileSync(stateFile,'utf8'));
+ assert.equal(persisted.lastHostBuild,'2.35.1|Electron/45|new-bundle');
+ assert.equal(persisted.agyVersion,'2.35.1');
+
+ // Manual reloadI18n uses zero-flicker reload() on both host and Swarm iframe
+ const reloadRes=await hc.reloadI18n({extraDict:{'New Feature':'新功能'}});
+ assert.equal(reloadRes.ok,true);
+ assert.equal(reloadRes.agyVersion,'2.35.1');
+ assert.equal(reloadRes.swarmFramesReloaded,1);
+ assert.ok(mainOps.some(e=>e.includes('__agyMaomaoHostI18n.reload')&&e.includes('New Feature')));
+ assert.ok(swarmOps.some(e=>e.includes('.reload')&&e.includes('New Feature')));
+ await hc.stop();
+});
+
+test('installUpdateToast serializes via toString(), mounts inside .toast-viewport with .agy-toast, adapts 4 surfaces, dodges cat pet, and handles update/dismiss',async()=>{
+ const vm=require('node:vm');
+ const {installUpdateToast,UPDATE_TOAST_KEY,UPDATE_TOAST_REV}=require('../src/host/modules/update-toast.cjs');
+ assert.equal(UPDATE_TOAST_KEY,'__agyMaomaoUpdateToast');
+ assert.equal(UPDATE_TOAST_REV,2);
+
+ function makeEl(tag){
+  const attrs=new Map();
+  const listeners=new Map();
+  const styleProps=new Map();
+  const el={
+   tagName:String(tag||'div').toUpperCase(),
+   id:'',
+   className:'',
+   textContent:'',
+   type:'',
+   disabled:false,
+   parentNode:null,
+   children:[],
+   classList:{
+    _set:new Set(),
+    add(...xs){xs.forEach(x=>this._set.add(x));},
+    remove(...xs){xs.forEach(x=>this._set.delete(x));},
+    contains(x){return this._set.has(x);},
+   },
+   style:{
+    setProperty(k,v){styleProps.set(k,v);},
+    getPropertyValue(k){return styleProps.get(k)||'';},
+   },
+   setAttribute(k,v){attrs.set(k,String(v));},
+   getAttribute(k){return attrs.has(k)?attrs.get(k):null;},
+   appendChild(c){c.parentNode=el;el.children.push(c);return c;},
+   append(...cs){cs.forEach(c=>el.appendChild(c));},
+   remove(){if(el.parentNode){const i=el.parentNode.children.indexOf(el);if(i>=0)el.parentNode.children.splice(i,1);el.parentNode=null;}},
+   addEventListener(ev,fn){if(!listeners.has(ev))listeners.set(ev,[]);listeners.get(ev).push(fn);},
+   click(){return Promise.all((listeners.get('click')||[]).map(fn=>fn()));},
+   find(pred){
+    if(pred(el))return el;
+    for(const c of el.children){const r=c.find(pred);if(r)return r;}
+    return null;
+   },
+  };
+  return el;
+ }
+
+ const head=makeEl('head');
+ const body=makeEl('body');
+ const html=makeEl('html');
+ html.classList.add('dark','agy-dream-active-v2');
+ const viewport=makeEl('div');
+ viewport.className='toast-viewport';
+ body.appendChild(viewport);
+
+ const petStage={getBoundingClientRect:()=>({left:1080,top:560,right:1260,bottom:705,width:180,height:145})};
+ let bubbleOpen=false;
+ const petBubble={
+  getBoundingClientRect:()=>bubbleOpen
+   ? {left:1005,top:352,right:1254,bottom:526,width:249,height:174}
+   : {left:1005,top:352,right:1254,bottom:526,width:0,height:0},
+ };
+ const petRoot={
+  id:'agy-maomao-pet-root',
+  shadowRoot:{
+   querySelector:(s)=>{
+    if(s==='.pet-stage')return petStage;
+    if(s==='.pet-bubble')return petBubble;
+    if(s==='.pet-bubble[data-open="true"]')return bubbleOpen?petBubble:null;
+    return null;
+   },
+  },
+ };
+
+ const observers=[];
+ class FakeMutationObserver{
+  constructor(cb){this.cb=cb;this.targets=[];this.disconnected=false;observers.push(this);}
+  observe(target,opts){this.targets.push({target,opts});}
+  disconnect(){this.disconnected=true;}
+ }
+
+ const fetchCalls=[];
+ const sandbox={
+  MutationObserver:FakeMutationObserver,
+  window:{
+   innerWidth:1280,
+   innerHeight:720,
+   addEventListener(){},
+   removeEventListener(){},
+  },
+  document:{
+   documentElement:html,
+   head,
+   body,
+   createElement:makeEl,
+   getElementById(id){
+    if(id==='agy-maomao-pet-root')return petRoot;
+    return head.find(e=>e.id===id)||body.find(e=>e.id===id);
+   },
+   querySelector(sel){return sel==='.toast-viewport'?viewport:null;},
+  },
+  fetch:async(url,init)=>{
+   fetchCalls.push({url,init});
+   return {ok:true,status:200,json:async()=>({ok:true,toVersion:'0.4.2'})};
+  },
+  setTimeout:(fn)=>({fn}),
+  clearTimeout:()=>{},
+  requestAnimationFrame:(fn)=>fn(),
+ };
+
+ const runInVm=(payload)=>vm.runInNewContext(`(${installUpdateToast.toString()})(${JSON.stringify(payload)})`,sandbox);
+
+ // 1. Mount inside .toast-viewport with glass-dark surface and cat-pet dodge (closed bubble -> dodges stage only)
+ const res1=runInVm({
+  owner:'o1',
+  currentVersion:'0.4.0',
+  latestVersion:'0.4.2',
+  releaseNotes:'新增底部更新提示\n修复气泡交互',
+  downloadUrl:'https://github.com/Fish-under-sea/Antigravity-maomao/releases/download/v0.4.2/pkg.zip',
+  sidecarBaseUrl:'http://127.0.0.1:45678',
+  sidecarToken:'tok-xyz',
+ });
+ assert.equal(res1.shown,true);
+ assert.equal(res1.rev,2);
+ assert.equal(res1.target,'toast-viewport');
+ assert.equal(res1.surface,'glass-dark');
+ assert.equal(res1.dodgePx,172);
+ const toastNode=viewport.children.find(c=>c.id==='agy-maomao-update-toast');
+ assert.ok(toastNode);
+ assert.equal(toastNode.className,'agy-toast');
+ assert.equal(toastNode.style.getPropertyValue('--agy-mm-upd-offset'),'172px');
+
+ // 1b. Pet speech/quota bubble opens dynamically AFTER toast mounted -> MutationObserver lifts toast above bubble top!
+ const bubbleObs=observers.find(o=>o.targets.some(t=>t.target===petBubble&&t.opts?.subtree===false));
+ assert.ok(bubbleObs,'must observe .pet-bubble with subtree:false');
+ bubbleOpen=true;
+ bubbleObs.cb();
+ assert.equal(toastNode.style.getPropertyValue('--agy-mm-upd-offset'),'380px');
+ assert.equal(sandbox.window.__agyMaomaoUpdateToast.status().dodgePx,380);
+ // Bubble closes -> toast returns cleanly above .pet-stage
+ bubbleOpen=false;
+ bubbleObs.cb();
+ assert.equal(toastNode.style.getPropertyValue('--agy-mm-upd-offset'),'172px');
+
+ // 2. Clicking "稍后" records dismissed version -> repeat call is deduplicated
+ const laterBtn=toastNode.find(e=>e.getAttribute('data-action')==='later');
+ assert.ok(laterBtn);
+ await laterBtn.click();
+ assert.equal(sandbox.window.__agyMaomaoUpdateToastDismissedVer,'0.4.2');
+ sandbox.window.__agyMaomaoUpdateToast.destroy();
+ assert.equal(bubbleObs.disconnected,true,'destroy() must disconnect petBubbleObs');
+ const dedupRes=runInVm({owner:'o1',latestVersion:'0.4.2'});
+ assert.equal(dedupRes.shown,false);
+ assert.equal(dedupRes.deduplicated,true);
+
+ // 3. Force show in light mode (no glass) and click "立即更新" -> calls POST /api/maomao/update/apply
+ html.classList.remove('dark','agy-dream-active-v2');
+ html.classList.add('light');
+ const res2=runInVm({
+  owner:'o1',
+  currentVersion:'0.4.0',
+  latestVersion:'0.4.2',
+  downloadUrl:'https://github.com/Fish-under-sea/Antigravity-maomao/releases/download/v0.4.2/pkg.zip',
+  sidecarBaseUrl:'http://127.0.0.1:45678',
+  sidecarToken:'tok-xyz',
+  forceShow:true,
+ });
+ assert.equal(res2.shown,true);
+ assert.equal(res2.surface,'light');
+ const toastNode2=viewport.children.find(c=>c.id==='agy-maomao-update-toast');
+ const updateBtn=toastNode2.find(e=>e.getAttribute('data-action')==='update');
+ await updateBtn.click();
+ assert.equal(fetchCalls.length,1);
+ assert.equal(fetchCalls[0].url,'http://127.0.0.1:45678/api/maomao/update/apply?token=tok-xyz');
+ assert.equal(fetchCalls[0].init.method,'POST');
+ assert.equal(updateBtn.textContent,'已安装，重载中…');
+
+ // 4. Prefers host-native toast callback when exposed
+ let nativeArgs=null;
+ sandbox.window.__agyNativeToast=(args)=>{nativeArgs=args;return true;};
+ const resNative=runInVm({owner:'o1',latestVersion:'0.4.3',releaseNotes:'Native check'});
+ assert.equal(resNative.shown,true);
+ assert.equal(resNative.target,'native-api');
+ assert.equal(nativeArgs.version,'0.4.3');
+});
+
+test('HostController.showHostUpdateToast degrades gracefully when disconnected, deduplicates per version, and destroys toast on stop',async()=>{
+ const ops=[];
+ const mainClient={
+  closed:false,
+  async evaluate(expr){
+   ops.push(expr);
+   if(expr.startsWith('({ready:'))return {ready:'complete',themed:false,owner:'',rev:0,stale:false};
+   if(expr.includes('installUpdateToast'))return {shown:true,target:'toast-viewport',surface:'dark',dodgePx:120};
+   return null;
+  },
+  close(){this.closed=true;}
+ };
+ const hc=new HostController(
+  {payload:cfg=>({...cfg,image:'data:image/png;base64,AA=='})},
+  ()=>{},
+  {
+   owner:'toast-owner',
+   sidecar:{baseUrl:'http://127.0.0.1:49999',token:'tok-9'},
+   discover:async()=>({port:55555,target:{webSocketDebuggerUrl:'ws://127.0.0.1:55555/page/1'}}),
+   listTargets:async()=>[],
+   createClient:()=>mainClient,
+  }
+ );
+
+ // Disconnected -> graceful degradation
+ const offRes=await hc.showHostUpdateToast({hasUpdate:true,latestVersion:'0.4.2'});
+ assert.equal(offRes.ok,false);
+ assert.equal(offRes.reason,'host_disconnected');
+
+ // Connect then trigger toast
+ await hc.update({enabled:false});
+ const show1=await hc.showHostUpdateToast({
+  hasUpdate:true,
+  currentVersion:'0.4.0',
+  latestVersion:'v0.4.2',
+  releaseNotes:'新功能发布',
+  downloadUrl:'https://github.com/Fish-under-sea/Antigravity-maomao/releases/download/v0.4.2/pkg.zip',
+ });
+ assert.equal(show1.ok,true);
+ assert.equal(show1.shown,true);
+ assert.equal(show1.version,'0.4.2');
+ assert.equal(show1.dodgePx,120);
+ assert.ok(ops.some(e=>e.includes('installUpdateToast')&&e.includes('http://127.0.0.1:49999')));
+
+ // Same version deduplicated without force
+ const opsCountBeforeDedup=ops.length;
+ const show2=await hc.showHostUpdateToast({hasUpdate:true,latestVersion:'0.4.2'});
+ assert.equal(show2.ok,true);
+ assert.equal(show2.shown,false);
+ assert.equal(show2.deduplicated,true);
+ assert.equal(ops.length,opsCountBeforeDedup);
+
+ // Force bypasses dedup
+ const show3=await hc.showHostUpdateToast({hasUpdate:true,latestVersion:'0.4.2',force:true});
+ assert.equal(show3.shown,true);
+ assert.ok(ops.length>opsCountBeforeDedup);
+
+ // stop() cleans up the mounted update toast
+ await hc.stop();
+ assert.ok(ops.some(e=>e.includes('__agyMaomaoUpdateToast?.destroy?.()')));
 });

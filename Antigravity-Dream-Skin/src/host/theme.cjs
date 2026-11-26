@@ -1,17 +1,19 @@
 // Serialized into the host by its existing local CDP endpoint. No app files are modified.
 async function installTheme(config) {
   const key = "__agyDreamSkinV2";
-  const THEME_REV = 25;
+  const THEME_REV = 27;
   if (window[key]) {
     if (window[key].owner && window[key].owner !== config.owner) {
       const dead = typeof window[key].lastSeen === "number" && Date.now() - window[key].lastSeen > 15000;
       const upgrading = typeof window[key].rev === "number" && window[key].rev < THEME_REV;
       if (!dead && !upgrading) throw new Error("皮肤由另一个运行实例管理");
     }
-    if (window[key].owner === config.owner && window[key].rev === THEME_REV && window[key].status().applied) {
-      window[key].touch?.();
-      window[key].update(config);
-      return window[key].status();
+    if (window[key].owner === config.owner && window[key].rev === THEME_REV) {
+      if (window[key].status().applied || window[key].heal?.()) {
+        window[key].touch?.();
+        window[key].update(config);
+        return window[key].status();
+      }
     }
     window[key].destroy();
   }
@@ -718,9 +720,10 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
    padding: 4px !important;
    border-radius: var(--agy-radius-card, 16px) !important;
  }
- /* 为 Swarm 侧栏在宿主侧的非 iframe 右栏容器上铺设独立 GPU 磨砂底板：
-    绝不触碰 [data-testid="sidecar-iframe-slot"] 及其内部 OOPIF（否则 Chromium Viz 会在样式重载时令 OOPIF 崩溃灰屏），
-    利用位于其正后方、不含任何 iframe 的 [data-testid="aux-pane-split"] > div:last-child 铺设 ::before 轻磨砂 + ::after 顶部 38px 强模糊羽化！ */
+ /* 为 Swarm 侧栏在宿主侧的非 iframe 右栏容器上铺设单层稳定 GPU 磨砂底板：
+    绝不触碰 [data-testid="sidecar-iframe-slot"] 及其内部 OOPIF（避免 Electron 44 / Chrome 152 Viz OOPIF 崩溃灰屏）；
+    取消双层 ::before + ::after + mask-image 重型叠加（4K60 视频下易触发 GPU tile 耗尽黑屏/闪黑），
+    统一使用单层 ::before 磨砂，4K 流畅模式收敛为纯 blur(12px)（无 saturate / mask-image），分栏拖动期间自动暂停模糊防闪黑！ */
  html.agy-dream-active-v2:has([data-testid="sidecar-iframe-slot"]:not([style*="display: none"]) iframe[src^="plugin://swarm"]) [data-testid="aux-pane-split"] > div:last-child {
    position: relative !important;
  }
@@ -737,20 +740,13 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
    -webkit-backdrop-filter: blur(14px) saturate(145%) !important;
    backdrop-filter: blur(14px) saturate(145%) !important;
  }
- html.agy-dream-active-v2:has([data-testid="sidecar-iframe-slot"]:not([style*="display: none"]) iframe[src^="plugin://swarm"]) [data-testid="aux-pane-split"] > div:last-child::after {
-   content: "" !important;
-   position: absolute !important;
-   top: 44px !important;
-   left: 4px !important;
-   right: 4px !important;
-   height: 146px !important;
-   z-index: 0 !important;
-   pointer-events: none !important;
-   border-radius: var(--agy-radius-inner, 11px) var(--agy-radius-inner, 11px) 0 0 !important;
-   -webkit-backdrop-filter: blur(38px) saturate(185%) !important;
-   backdrop-filter: blur(38px) saturate(185%) !important;
-   -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 84%, transparent 100%) !important;
-   mask-image: linear-gradient(to bottom, #000 0%, #000 84%, transparent 100%) !important;
+ html.agy-dream-active-v2[data-agy-smooth-video="1"]:has([data-testid="sidecar-iframe-slot"]:not([style*="display: none"]) iframe[src^="plugin://swarm"]) [data-testid="aux-pane-split"] > div:last-child::before {
+   -webkit-backdrop-filter: blur(12px) !important;
+   backdrop-filter: blur(12px) !important;
+ }
+ html.agy-dream-active-v2.agy-dream-animating-split:has([data-testid="sidecar-iframe-slot"]:not([style*="display: none"]) iframe[src^="plugin://swarm"]) [data-testid="aux-pane-split"] > div:last-child::before {
+   -webkit-backdrop-filter: none !important;
+   backdrop-filter: none !important;
  }
  html.agy-dream-active-v2 [data-agy-theme-style="star-neko"] :is([role=tab][aria-selected=true], [role=tab][data-state=active]) {
    background: linear-gradient(180deg, rgba(164, 136, 235, .28), rgba(118, 92, 180, .14)) !important;
@@ -886,7 +882,7 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
    .agy-fastpick,
    [role=menu],
    [role=dialog]
- ):not(.toast-root):not(.toast-viewport *) {
+ ):not(.toast-root):not(.toast-viewport *):not([data-agy-maomao-radial="1"]):not([data-agy-maomao-radial="1"] *) {
    background-color: color-mix(in srgb, var(--lg-pop-surface) max(var(--agy-glass-overlay-fill, 68%), 82%), var(--lg-overlay-wash)) !important;
    background-image:
      radial-gradient(420px 110px at 14% -12px, color-mix(in srgb, var(--lg-tint, #ffffff) 22%, rgba(255, 255, 255, .12)) 0%, transparent 62%),
@@ -1801,10 +1797,24 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
       chatWidth: localChatWidth !== null ? localChatWidth : configChatWidth,
     };
   };
+  function heal() {
+    if (!active || !root || !root.isConnected) return false;
+    try {
+      if (!style.isConnected && document.head) document.head.append(style);
+      if (!tokenStyle.isConnected && document.head) document.head.append(tokenStyle);
+      if (!layer.isConnected && document.body) document.body.prepend(layer);
+      document.documentElement.classList.add("agy-dream-active-v2");
+      return Boolean(root.isConnected && layer.isConnected && style.isConnected);
+    } catch {
+      return false;
+    }
+  }
+
   const entry = {
     update,
     destroy,
     status,
+    heal,
     touch: () => {
       entry.lastSeen = Date.now();
       return true;
@@ -1824,12 +1834,13 @@ html.agy-dream-active-v2:has(body.dark-theme):root {
 
 function installPluginFrameTheme(config) {
   const key = "__agyDreamPluginFrameV2";
-  const FRAME_REV = 4;
+  const FRAME_REV = 5;
   if (document.readyState === "loading") {
     return { applied: false, loading: true };
   }
   if (window[key]) {
     if (window[key].owner === config.owner && window[key].rev === FRAME_REV) {
+      window[key].touch?.();
       window[key].update(config);
       return { applied: true, rev: FRAME_REV };
     }
@@ -1838,23 +1849,176 @@ function installPluginFrameTheme(config) {
   const head = document.head || document.documentElement;
   if (!head) return { applied: false };
 
+  const HOST_TOKEN_KEYS = [
+    "--foreground",
+    "--secondary-foreground",
+    "--muted-foreground",
+    "--border",
+    "--card-border",
+    "--primary",
+    "--secondary",
+    "--muted",
+    "--placeholder",
+  ];
+
   const style = document.createElement("style");
   style.id = "agy-dream-plugin-frame-v2";
 
-  function detectLightTheme() {
+  let active = true;
+  let currentCfg = config || {};
+  let headerRo = null;
+  let healObserver = null;
+  let healTimer = 0;
+  let healing = false;
+  let healBurstCount = 0;
+  let healBurstWindowStart = 0;
+  let savedDataTheme = null; // { existed, value }
+  const savedTokenProps = new Map(); // prop -> { value, priority }
+
+  function sanitizeCssVal(raw) {
+    if (typeof raw !== "string") return "";
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed.length > 160 || /[;{}\r\n<>]/.test(trimmed)) return "";
+    return trimmed;
+  }
+
+  function parseColorLuminance(val) {
+    const s = String(val || "").trim();
+    const hex6 = /^#([0-9a-f]{6})$/i.exec(s);
+    if (hex6) {
+      const n = parseInt(hex6[1], 16);
+      return ((n >> 16) & 255) + ((n >> 8) & 255) + (n & 255);
+    }
+    const hex3 = /^#([0-9a-f]{3})$/i.exec(s);
+    if (hex3) {
+      const r = parseInt(hex3[1][0] + hex3[1][0], 16);
+      const g = parseInt(hex3[1][1] + hex3[1][1], 16);
+      const b = parseInt(hex3[1][2] + hex3[1][2], 16);
+      return r + g + b;
+    }
+    const rgb = /^rgba?\(\s*([\d.]+)\s*[,\s]\s*([\d.]+)\s*[,\s]\s*([\d.]+)/i.exec(s);
+    if (rgb) {
+      return Number(rgb[1]) + Number(rgb[2]) + Number(rgb[3]);
+    }
+    return null;
+  }
+
+  function darkFallbackTokens(starNeko) {
+    return starNeko
+      ? {
+          "--foreground": "#f3edfc",
+          "--secondary-foreground": "#d9cef0",
+          "--muted-foreground": "#a89dc0",
+          "--border": "rgba(174, 142, 218, 0.24)",
+          "--card-border": "rgba(174, 142, 218, 0.22)",
+          "--primary": "#bda2f2",
+          "--secondary": "rgba(164, 136, 235, 0.16)",
+          "--muted": "rgba(255, 255, 255, 0.06)",
+          "--placeholder": "rgba(216, 204, 240, 0.52)",
+        }
+      : {
+          "--foreground": "#eef0f6",
+          "--secondary-foreground": "#cbd5e1",
+          "--muted-foreground": "#94a3b8",
+          "--border": "rgba(255, 255, 255, 0.14)",
+          "--card-border": "rgba(255, 255, 255, 0.12)",
+          "--primary": "#60a5fa",
+          "--secondary": "rgba(255, 255, 255, 0.08)",
+          "--muted": "rgba(255, 255, 255, 0.05)",
+          "--placeholder": "rgba(203, 213, 225, 0.52)",
+        };
+  }
+
+  function detectLightTheme(cfg) {
+    if (typeof cfg?.hostDark === "boolean") {
+      return !cfg.hostDark;
+    }
     try {
       const themeAttr = document.documentElement.getAttribute?.("data-theme");
       if (themeAttr === "dark") return false;
       const fg = getComputedStyle(document.documentElement).getPropertyValue("--foreground").trim();
-      const m = /^#([0-9a-f]{6})$/i.exec(fg);
-      if (m) {
-        const n = parseInt(m[1], 16);
-        const lum = ((n >> 16) & 255) + ((n >> 8) & 255) + (n & 255);
-        return lum < 260;
-      }
+      const lum = parseColorLuminance(fg);
+      if (lum !== null) return lum < 260;
       if (themeAttr === "light") return true;
     } catch {}
     return false;
+  }
+
+  function setDocToken(prop, value) {
+    const docEl = document.documentElement;
+    if (!docEl || !docEl.style || typeof docEl.style.setProperty !== "function") return;
+    if (!savedTokenProps.has(prop)) {
+      savedTokenProps.set(prop, {
+        value: typeof docEl.style.getPropertyValue === "function" ? docEl.style.getPropertyValue(prop) : "",
+        priority: typeof docEl.style.getPropertyPriority === "function" ? docEl.style.getPropertyPriority(prop) : "",
+      });
+    }
+    docEl.style.setProperty(prop, value);
+  }
+
+  function restoreThemeOverrides() {
+    const docEl = document.documentElement;
+    if (!docEl) return;
+    if (savedDataTheme) {
+      try {
+        if (savedDataTheme.existed) docEl.setAttribute?.("data-theme", savedDataTheme.value);
+        else docEl.removeAttribute?.("data-theme");
+      } catch {}
+      savedDataTheme = null;
+    }
+    if (docEl.style) {
+      for (const [prop, orig] of savedTokenProps.entries()) {
+        try {
+          if (orig.value) docEl.style.setProperty?.(prop, orig.value, orig.priority);
+          else docEl.style.removeProperty?.(prop);
+        } catch {}
+      }
+    }
+    savedTokenProps.clear();
+  }
+
+  function syncHostDarkAndTokens(cfg) {
+    const docEl = document.documentElement;
+    if (!docEl) return;
+    if (cfg?.hostDark !== true) return;
+
+    const starNeko = cfg?.glass?.themeStyle !== "official";
+    const fallbacks = darkFallbackTokens(starNeko);
+    const incoming = cfg?.hostTokens && typeof cfg.hostTokens === "object" ? cfg.hostTokens : {};
+
+    // Repair stale data-theme="light" or missing data-theme caused by missed preload postMessage
+    const curTheme = docEl.getAttribute?.("data-theme");
+    if (curTheme !== "dark") {
+      if (!savedDataTheme) {
+        savedDataTheme = {
+          existed: typeof docEl.hasAttribute === "function" ? docEl.hasAttribute("data-theme") : curTheme !== null,
+          value: curTheme ?? "",
+        };
+      }
+      try {
+        docEl.setAttribute?.("data-theme", "dark");
+      } catch {}
+    }
+
+    // Repair missing --foreground / dark-on-dark ink and missing dark border/text tokens
+    let cs = null;
+    try {
+      cs = typeof getComputedStyle === "function" ? getComputedStyle(docEl) : null;
+    } catch {}
+    const curFg = cs ? String(cs.getPropertyValue("--foreground") || "").trim() : "";
+    const curFgLum = parseColorLuminance(curFg);
+    const fgBroken = !curFg || (curFgLum !== null && curFgLum < 320);
+
+    for (let i = 0; i < HOST_TOKEN_KEYS.length; i++) {
+      const prop = HOST_TOKEN_KEYS[i];
+      const curVal = cs ? String(cs.getPropertyValue(prop) || "").trim() : "";
+      const incomingVal = sanitizeCssVal(incoming[prop]);
+      const needRepair = !curVal || (prop === "--foreground" && fgBroken) || (fgBroken && Boolean(incomingVal));
+      if (needRepair) {
+        const nextVal = incomingVal || fallbacks[prop];
+        if (nextVal) setDocToken(prop, nextVal);
+      }
+    }
   }
 
   function renderCss(cfg) {
@@ -1864,11 +2028,12 @@ function installPluginFrameTheme(config) {
     const ctFill = Math.min(100, Math.max(0, Math.round(Number(r.content?.fill ?? 60))));
     const hdFill = Math.min(100, Math.max(0, Math.round(Number(r.header?.fill ?? 84))));
     const starNeko = g.themeStyle !== "official";
-    const isLight = detectLightTheme();
+    const isLight = detectLightTheme(cfg);
+    const smoothVideo = cfg?.smoothVideo === true;
 
     const bodyAlpha = Math.max(0.28, Math.min(0.62, (ctFill / 100) * 0.64));
     const cardAlpha = Math.max(0.38, Math.min(0.84, ctFill / 100));
-    const stickyAlpha = Math.max(0.92, Math.min(0.96, hdFill / 100 + 0.1));
+    const stickyAlpha = Math.max(0.93, Math.min(0.97, hdFill / 100 + 0.1));
 
     const bodyTint = isLight
       ? `rgba(246, 242, 254, ${bodyAlpha})`
@@ -1890,6 +2055,21 @@ function installPluginFrameTheme(config) {
     const searchFocusBg = isLight ? "rgba(255, 255, 255, 0.72)" : "rgba(38, 32, 54, 0.72)";
     const searchBorder = isLight ? "rgba(150, 122, 200, 0.22)" : "rgba(182, 152, 228, 0.16)";
     const toastFg = isLight ? "#f8f5ff" : "#151221";
+    const headerBlur = smoothVideo ? "blur(12px)" : "blur(24px) saturate(155%)";
+
+    // Build CSS fallback lines when hostDark is explicitly true so even before JS token repair, :root never flashes white
+    let darkTokenCss = "";
+    if (cfg?.hostDark === true) {
+      const incoming = cfg?.hostTokens && typeof cfg.hostTokens === "object" ? cfg.hostTokens : {};
+      const fallbacks = darkFallbackTokens(starNeko);
+      const lines = [];
+      for (let i = 0; i < HOST_TOKEN_KEYS.length; i++) {
+        const k = HOST_TOKEN_KEYS[i];
+        const v = sanitizeCssVal(incoming[k]) || fallbacks[k];
+        if (v) lines.push(`  ${k}: ${v};`);
+      }
+      darkTokenCss = "\n" + lines.join("\n");
+    }
 
     return `
 html.agy-dream-plugin-frame-v2,
@@ -1899,7 +2079,7 @@ html.agy-dream-plugin-frame-v2:root {
   --sw-bg: transparent !important;
   --vscode-editor-background: transparent !important;
   --card: ${cardBg} !important;
-  --sw-card: ${cardBg} !important;
+  --sw-card: ${cardBg} !important;${darkTokenCss}
 }
 html.agy-dream-plugin-frame-v2 {
   background: transparent !important;
@@ -1908,6 +2088,7 @@ html.agy-dream-plugin-frame-v2 {
 html.agy-dream-plugin-frame-v2 body {
   background-color: ${bodyTint} !important;
   background-image: none !important;
+  ${cfg?.hostDark === true ? "color: var(--foreground, #f3edfc) !important;" : ""}
 }
 html.agy-dream-plugin-frame-v2 :is(.board, .main, .tab-body, #root, #app) {
   background: transparent !important;
@@ -1924,13 +2105,13 @@ html.agy-dream-plugin-frame-v2 .tab-body:not(#tab-feed) {
 html.agy-dream-plugin-frame-v2 #tab-feed > :not(.toolbar):not(.jump) {
   padding-inline: var(--inline) !important;
 }
-/* Swarm 顶栏 + 搜索工具栏：完全统一色值与强磨砂，彻底删除中间 border-bottom 与亚像素缝隙使其无缝融为一体 */
+/* Swarm 顶栏 + 搜索工具栏：高不透明度无缝液态玻璃，彻底消除中间 border-bottom 与亚像素缝隙，同时避免重型模糊爆 GPU */
 html.agy-dream-plugin-frame-v2 .header,
 html.agy-dream-plugin-frame-v2 header[class*="sticky"],
 html.agy-dream-plugin-frame-v2 #tab-feed > .toolbar {
   background-color: ${stickyBg} !important;
-  -webkit-backdrop-filter: blur(38px) saturate(185%) !important;
-  backdrop-filter: blur(38px) saturate(185%) !important;
+  -webkit-backdrop-filter: ${headerBlur} !important;
+  backdrop-filter: ${headerBlur} !important;
 }
 html.agy-dream-plugin-frame-v2 .header,
 html.agy-dream-plugin-frame-v2 header[class*="sticky"] {
@@ -1989,7 +2170,6 @@ html.agy-dream-plugin-frame-v2 ::-webkit-scrollbar-thumb {
 }`;
   }
 
-  let headerRo = null;
   function syncHeaderHeight() {
     try {
       const board = document.getElementById?.("board");
@@ -2004,14 +2184,84 @@ html.agy-dream-plugin-frame-v2 ::-webkit-scrollbar-thumb {
     } catch {}
   }
 
-  function update(next) {
-    style.textContent = renderCss(next);
-    syncHeaderHeight();
+  function performHeal() {
+    if (!active || healing) return;
+    const now = Date.now();
+    if (now - healBurstWindowStart > 1000) {
+      healBurstWindowStart = now;
+      healBurstCount = 0;
+    }
+    if (healBurstCount >= 12) return;
+    healing = true;
+    healBurstCount++;
+    try {
+      const targetHead = document.head || document.documentElement;
+      const styleMissing =
+        style.isConnected === false ||
+        (targetHead && Array.isArray(targetHead.children) && !targetHead.children.includes(style) &&
+          typeof document.getElementById === "function" && !document.getElementById(style.id));
+      if (styleMissing && targetHead && typeof targetHead.appendChild === "function") {
+        targetHead.appendChild(style);
+      }
+      const docEl = document.documentElement;
+      if (docEl && docEl.classList && typeof docEl.classList.add === "function") {
+        if (typeof docEl.classList.contains !== "function" || !docEl.classList.contains("agy-dream-plugin-frame-v2")) {
+          docEl.classList.add("agy-dream-plugin-frame-v2");
+        }
+      }
+      if (currentCfg?.hostDark === true) {
+        syncHostDarkAndTokens(currentCfg);
+      }
+      const nextCss = renderCss(currentCfg);
+      if (style.textContent !== nextCss) style.textContent = nextCss;
+      syncHeaderHeight();
+    } catch {}
+    finally {
+      healing = false;
+    }
   }
+
+  function scheduleHeal() {
+    if (!active || healing || healTimer) return;
+    healTimer = setTimeout(() => {
+      healTimer = 0;
+      performHeal();
+    }, 16);
+  }
+
+  function update(next) {
+    currentCfg = next || {};
+    healing = true;
+    try {
+      const targetHead = document.head || document.documentElement;
+      if (style.isConnected === false && targetHead && typeof targetHead.appendChild === "function") {
+        targetHead.appendChild(style);
+      }
+      document.documentElement.classList.add("agy-dream-plugin-frame-v2");
+      if (currentCfg.hostDark === true) {
+        syncHostDarkAndTokens(currentCfg);
+      } else if (currentCfg.hostDark === false) {
+        restoreThemeOverrides();
+      }
+      style.textContent = renderCss(currentCfg);
+      syncHeaderHeight();
+    } finally {
+      healing = false;
+    }
+  }
+
   function destroy() {
+    active = false;
+    if (healTimer) {
+      clearTimeout(healTimer);
+      healTimer = 0;
+    }
+    try { healObserver?.disconnect(); } catch {}
+    healObserver = null;
     try { headerRo?.disconnect(); } catch {}
     headerRo = null;
     try { document.getElementById?.("board")?.style?.removeProperty("--agy-header-h"); } catch {}
+    restoreThemeOverrides();
     style.remove();
     document.documentElement.classList.remove("agy-dream-plugin-frame-v2");
     delete window[key];
@@ -2028,8 +2278,49 @@ html.agy-dream-plugin-frame-v2 ::-webkit-scrollbar-thumb {
       headerRo.observe(header);
     }
   } catch {}
-  window[key] = { rev: FRAME_REV, owner: config.owner, update, destroy };
+  try {
+    if (typeof MutationObserver === "function") {
+      healObserver = new MutationObserver(() => {
+        if (!active || healing) return;
+        const targetHead = document.head || document.documentElement;
+        const docEl = document.documentElement;
+        const missingStyle =
+          style.isConnected === false ||
+          (targetHead && Array.isArray(targetHead.children) && !targetHead.children.includes(style));
+        const missingClass =
+          docEl?.classList && typeof docEl.classList.contains === "function"
+            ? !docEl.classList.contains("agy-dream-plugin-frame-v2")
+            : false;
+        const wrongTheme =
+          currentCfg?.hostDark === true && docEl?.getAttribute?.("data-theme") !== "dark";
+        if (missingStyle || missingClass || wrongTheme) {
+          scheduleHeal();
+        }
+      });
+      healObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["class", "data-theme"],
+      });
+      if (head && head !== document.documentElement) {
+        healObserver.observe(head, { childList: true });
+      }
+    }
+  } catch {}
+
+  const entry = {
+    rev: FRAME_REV,
+    owner: config.owner,
+    lastSeen: Date.now(),
+    touch: () => {
+      entry.lastSeen = Date.now();
+      return true;
+    },
+    update,
+    heal: performHeal,
+    destroy,
+  };
+  window[key] = entry;
   return { applied: true, rev: FRAME_REV };
 }
 
-module.exports = { installTheme, installPluginFrameTheme };
+module.exports = { THEME_REV: 27, FRAME_REV: 5, installTheme, installPluginFrameTheme };
