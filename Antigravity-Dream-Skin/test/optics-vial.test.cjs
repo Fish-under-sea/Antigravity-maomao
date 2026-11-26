@@ -809,7 +809,7 @@ test("telemetry-bar mounts 3 icons, folds on narrow width, yields/takes over AG 
     assert.equal(res.mounted, true);
 
     await new Promise((r) => setTimeout(r, 10));
-    assert.ok(fetchCalls.some((u) => u.includes("/api/maomao/telemetry?conversationId=conv-alpha-001&token=tok-123")));
+    assert.ok(fetchCalls.some((u) => u.includes("/api/maomao/telemetry?conversationId=conv-alpha-001&strict=1&token=tok-123")));
 
     const host = dom.body.querySelector("#agy-maomao-telemetry-host");
     assert.ok(host, "telemetry host mounted in footer");
@@ -855,6 +855,24 @@ test("telemetry-bar mounts 3 icons, folds on narrow width, yields/takes over AG 
     assert.match(remountedCss, /\.tb-pill\s*\{[^}]*background:\s*transparent/, "remounted ShadowRoot must inject full CSS even when theme key is unchanged");
     assert.ok(remountedHost.shadowRoot?.querySelector('[data-role="telemetry-pill"]'), "remounted ShadowRoot must render pill content");
     sr = remountedHost.shadowRoot;
+
+    // Regression: switching to a brand-new conversation (pathname="/") must NEVER leak an unrelated sidebar [data-cascade-id] or old conversation stats!
+    const sidebarItem = dom.makeElement("div", { attrs: { "data-cascade-id": "unrelated-sidebar-conv-999" } });
+    dom.body.append(sidebarItem);
+    const prevPath = dom.window.location.pathname;
+    dom.window.location.pathname = "/";
+    dom.window.__agyMaomaoTelemetryBar.rescan();
+    assert.match(sr.querySelector('[data-role="speed"]').textContent, /-- tok\/s/, "new conversation must reset TPS instead of leaking old conversation");
+    assert.match(sr.querySelector('[data-role="tokens"]').textContent, /0 tok/, "new conversation must reset tokens to 0");
+    assert.match(sr.querySelector('[data-role="context"]').textContent, /上下文 0%/, "new conversation must reset context to 0%");
+    assert.ok(
+      fetchCalls.some((u) => u.includes("/api/maomao/telemetry?conversationId=&strict=1&token=tok-123")),
+      "new conversation must query strict=1 with empty conversationId (not sidebar data-cascade-id)"
+    );
+    sidebarItem.remove();
+    dom.window.location.pathname = prevPath;
+    dom.window.__agyMaomaoTelemetryBar.rescan();
+    await new Promise((r) => setTimeout(r, 15));
 
     // Medium width progressively folds to concise "缓存命中 84%" + "82%"
     footer.rect.width = 560;

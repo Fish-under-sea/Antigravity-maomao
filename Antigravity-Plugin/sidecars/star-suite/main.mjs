@@ -532,7 +532,8 @@ export async function createStarSuiteService(options = {}) {
       return { ok: false, error: "遥测模块未加载" };
     }
     const convId = typeof params.conversationId === "string" && params.conversationId.trim() ? params.conversationId.trim() : undefined;
-    const telemetry = telemetryDb.getConversationTelemetry(appDataDir, convId);
+    const strict = params.strict === "1" || params.strict === true;
+    const telemetry = telemetryDb.getConversationTelemetry(appDataDir, convId, { strict });
     const includeQuota = params.includeQuota !== "0" && settings.get("features")?.telemetry?.quotaEnabled !== false;
     const quota = includeQuota ? await readQuotaCached(params.force === "1") : null;
     const cacheStats = telemetryDb.getTrajectoryCacheStats ? telemetryDb.getTrajectoryCacheStats(appDataDir) : null;

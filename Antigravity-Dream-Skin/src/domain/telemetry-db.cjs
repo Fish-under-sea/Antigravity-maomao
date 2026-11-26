@@ -1198,9 +1198,12 @@ function getTrajectoryCacheStats(appDataDir, opts = {}) {
  * Gather full telemetry for a conversation, including context breakdown, streaming TPS,
  * child subagents, and local trajectory cache size.
  */
-function getConversationTelemetry(appDataDir, conversationId) {
+function getConversationTelemetry(appDataDir, conversationId, opts = {}) {
   const dir = resolveAppDataDir(appDataDir);
-  const resolvedId = conversationId ? (isValidConversationId(conversationId) ? conversationId : '') : resolveDefaultConversationId(dir);
+  const strict = Boolean(opts && opts.strict);
+  const resolvedId = conversationId
+    ? (isValidConversationId(conversationId) ? conversationId : '')
+    : (strict ? '' : resolveDefaultConversationId(dir));
   const cacheStats = getTrajectoryCacheStats(dir);
 
   if (!resolvedId) {

@@ -1,4 +1,4 @@
-# 喵言喵语 · Antigravity-maomao 原生插件（v0.4.0 / 适用 Antigravity 2.x）
+# 喵言喵语 · Antigravity-maomao 原生插件（v0.4.1 / 适用 Antigravity 2.x）
 
 **结论先行**：100% MIT 净室一体化 Antigravity 原生插件——整合 4K60 动态视频/自定义图片壁纸与液态磨砂玻璃（含 Swarm 防白/黑屏）、内置 Shadow DOM 猫娘桌宠（0 独立进程 + 0px 贴角吸附 + 戳一戳查 5h/周配额）、真实模型面板星空推理滑块与 Orchestrator 切工水晶条、底栏无框遥测条 + 512K 物理浅水波试管 + 980px 用量看板与模型调用日志、纯圆形 6 分块右键轮盘、全界面汉化（严守模型名与思考强度原英文 + AGY 升级自动/手动重载）以及插件内安全在线更新。
 

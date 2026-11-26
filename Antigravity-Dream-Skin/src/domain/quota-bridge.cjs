@@ -1285,6 +1285,17 @@ function isBinaryBuffer(buf) {
   return len > 0 && nonText / len > 0.3;
 }
 
+function realPathNative(p) {
+  try {
+    if (typeof fs.realpathSync.native === 'function') {
+      return fs.realpathSync.native(p);
+    }
+    return fs.realpathSync(p);
+  } catch {
+    return path.resolve(p);
+  }
+}
+
 function canonicalForCompare(p) {
   const norm = path.resolve(p);
   return process.platform === 'win32' ? norm.toLowerCase() : norm;
@@ -1398,12 +1409,7 @@ function getSafeGitDiff(filePath, opts = {}) {
     }
   }
 
-  let realFile;
-  try {
-    realFile = fs.realpathSync(resolved);
-  } catch {
-    realFile = resolved;
-  }
+  const realFile = realPathNative(resolved);
 
   const gitExec = (args, cwd) =>
     spawnSync('git', args, {
@@ -1420,12 +1426,7 @@ function getSafeGitDiff(filePath, opts = {}) {
     return { ok: false, inRepo: false, error: '目标文件不在合法 Git 仓库内' };
   }
 
-  let realRepoRoot;
-  try {
-    realRepoRoot = fs.realpathSync(topRes.stdout.trim());
-  } catch {
-    realRepoRoot = path.resolve(topRes.stdout.trim());
-  }
+  const realRepoRoot = realPathNative(topRes.stdout.trim());
 
   if (!isRealPathInside(realRepoRoot, realFile)) {
     return { ok: false, inRepo: false, error: '目标文件解析路径超出 Git 仓库边界' };

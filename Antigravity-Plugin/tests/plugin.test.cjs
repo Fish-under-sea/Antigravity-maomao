@@ -337,7 +337,7 @@ test("media picker uses UTF-8 UTF-16LE encoded PowerShell args and web preview a
 test("v0.4.0 plugin manifest uses 喵言喵语 branding, bundles cat-pet & host modules, and enforces API/SSRF guards", async (t) => {
   const manifest = JSON.parse(fs.readFileSync(path.join(pluginRoot, "plugin.json"), "utf8"));
   const sidecar = JSON.parse(fs.readFileSync(path.join(pluginRoot, "sidecars/star-suite/sidecar.json"), "utf8"));
-  assert.equal(manifest.version, "0.4.0");
+  assert.match(manifest.version, /^0\.4\.\d+$/);
   assert.equal(manifest.display_name, "喵言喵语");
   assert.equal(sidecar.display_name, "喵言喵语");
   assert.equal(sidecar.ui_config.display_name, "喵言喵语");
@@ -509,19 +509,19 @@ test("sidecar exposes /api/update/check, /api/update/apply (with restart hook & 
     },
     checkForPluginUpdate: async ({ currentVersion }) => ({
       currentVersion,
-      latestVersion: "0.4.1",
+      latestVersion: "0.4.9",
       hasUpdate: true,
       releaseNotes: "修复汉化重载与新增在线更新",
-      releaseUrl: "https://github.com/Fish-under-sea/Antigravity-maomao/releases/tag/v0.4.1",
-      assetName: "antigravity-maomao-plugin-v0.4.1.zip",
+      releaseUrl: "https://github.com/Fish-under-sea/Antigravity-maomao/releases/tag/v0.4.9",
+      assetName: "antigravity-maomao-plugin-v0.4.9.zip",
       assetSize: 524288,
-      downloadUrl: "https://github.com/Fish-under-sea/Antigravity-maomao/releases/download/v0.4.1/antigravity-maomao-plugin-v0.4.1.zip",
+      downloadUrl: "https://github.com/Fish-under-sea/Antigravity-maomao/releases/download/v0.4.9/antigravity-maomao-plugin-v0.4.9.zip",
       publishedAt: "2026-11-26T10:00:00Z",
       checkedAt: Date.now(),
     }),
     downloadAndInstallUpdate: async ({ targetDir }) => {
       appliedTargetDir = targetDir;
-      return { ok: true, fromVersion: "0.4.0", toVersion: "0.4.1", targetDir };
+      return { ok: true, fromVersion: "0.4.1", toVersion: "0.4.9", targetDir };
     },
   };
 
@@ -545,15 +545,16 @@ test("sidecar exposes /api/update/check, /api/update/apply (with restart hook & 
     await service.stop();
   });
 
+  const pkgManifest = JSON.parse(fs.readFileSync(path.join(pluginRoot, "plugin.json"), "utf8"));
   const st0 = await (await fetch(`${httpSrv.url}/api/state`)).json();
-  assert.equal(st0.pluginVersion, "0.4.0");
+  assert.equal(st0.pluginVersion, pkgManifest.version);
   assert.equal(st0.i18nOverrideCount, 1);
   assert.equal(typeof st0.updateStatus, "object");
 
   const chkRes = await (await fetch(`${httpSrv.url}/api/update/check?force=1`)).json();
   assert.equal(chkRes.ok, true);
   assert.equal(chkRes.hasUpdate, true);
-  assert.equal(chkRes.latestVersion, "0.4.1");
+  assert.equal(chkRes.latestVersion, "0.4.9");
 
   const applyRes = await (await fetch(`${httpSrv.url}/api/update/apply`, {
     method: "POST",
@@ -563,7 +564,7 @@ test("sidecar exposes /api/update/check, /api/update/apply (with restart hook & 
   assert.equal(applyRes.ok, true);
   assert.equal(applyRes.restarting, true);
   assert.equal(appliedTargetDir, installedDir);
-  assert.ok(restartedPayload && restartedPayload.toVersion === "0.4.1");
+  assert.ok(restartedPayload && restartedPayload.toVersion === "0.4.9");
 
   const relRes = await (await fetch(`${httpSrv.url}/api/i18n/reload`, {
     method: "POST",

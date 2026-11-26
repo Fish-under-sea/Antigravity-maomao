@@ -559,6 +559,8 @@ function installTelemetryBar(config) {
   let popoverPos = null; // { left, top } once dragged
   let popoverDragging = false;
   let fetchInFlight = false;
+  let telemetryFetchSeq = 0;
+  let lastConversationId = null;
   let lastToolbarCssKey = "";
   let lastPopoverCssKey = "";
   let lastDashboardCssKey = "";
@@ -696,12 +698,68 @@ function installTelemetryBar(config) {
     try {
       const m = /\/c\/([a-zA-Z0-9_-]+)/.exec(String(window.location?.pathname || ""));
       if (m) return m[1];
-      const el = document.querySelector?.("[data-cascade-id], [data-conversation-id]");
-      if (el) {
-        return el.getAttribute("data-cascade-id") || el.getAttribute("data-conversation-id") || "";
+      // Strictly inspect the active conversation view or the composer's own ancestor —
+      // NEVER query global `[data-cascade-id]`, which matches unrelated items in the left sidebar!
+      const view = document.querySelector?.('[data-testid="conversation-view"]');
+      if (view) {
+        const viewId = view.getAttribute?.("data-cascade-id") || view.getAttribute?.("data-conversation-id") || "";
+        if (viewId) return viewId;
+      }
+      const scoped = hostEl?.closest?.("[data-cascade-id], [data-conversation-id]") || null;
+      if (scoped) {
+        return scoped.getAttribute?.("data-cascade-id") || scoped.getAttribute?.("data-conversation-id") || "";
       }
     } catch {}
     return "";
+  }
+
+  function makeEmptyTelemetry(cid) {
+    return {
+      conversationId: cid || "",
+      model: "",
+      role: "",
+      tps: null,
+      latestTps: null,
+      ttftSeconds: null,
+      rounds: 0,
+      totalTokens: 0,
+      inputTokens: 0,
+      cacheReadTokens: 0,
+      outputTokens: 0,
+      cacheHitPercent: null,
+      costUsd: 0,
+      context: {
+        usedTokens: 0,
+        maxTokens: 524288,
+        usedPercent: 0,
+        categories: [],
+        compactions: 0,
+        compactedPending: false,
+      },
+      subagents: [],
+      quota: telemetryData?.quota || null,
+      cacheSizeBytes: Number(telemetryData?.cacheSizeBytes) || 0,
+    };
+  }
+
+  function syncConversationContext(triggerFetch) {
+    const cid = detectConversationId();
+    if (lastConversationId === null) {
+      lastConversationId = cid;
+      if (!cid && !telemetryData) telemetryData = makeEmptyTelemetry("");
+      return false;
+    }
+    if (cid === lastConversationId) return false;
+    lastConversationId = cid;
+    telemetryData = makeEmptyTelemetry(cid);
+    lastToolbarSig = "";
+    lastPopoverSig = "";
+    renderToolbar();
+    if (popoverOpen) renderPopover();
+    if (triggerFetch) {
+      void fetchTelemetry(true);
+    }
+    return true;
   }
 
   function detectWorkingState() {
@@ -2645,15 +2703,19 @@ svg {
   // ---- Network Polling (2s open / 5s closed / pause on blur or hidden) ----
   let windowBlurred = false;
 
-  async function fetchTelemetry() {
-    if (!active || fetchInFlight || !cfg.enabled || !cfg.sidecarBaseUrl || typeof fetch !== "function") return null;
+  async function fetchTelemetry(forceNew) {
+    if (!active || (!forceNew && fetchInFlight) || !cfg.enabled || !cfg.sidecarBaseUrl || typeof fetch !== "function") return null;
+    syncConversationContext(false);
+    const cid = detectConversationId();
+    const seq = ++telemetryFetchSeq;
     fetchInFlight = true;
     try {
-      const cid = detectConversationId();
-      const qs = `conversationId=${encodeURIComponent(cid)}&token=${encodeURIComponent(cfg.sidecarToken)}`;
+      const qs = `conversationId=${encodeURIComponent(cid)}&strict=1&token=${encodeURIComponent(cfg.sidecarToken)}`;
       const res = await fetch(`${cfg.sidecarBaseUrl}/api/maomao/telemetry?${qs}`);
       if (res && res.ok) {
         const data = await res.json();
+        // Guard against stale in-flight response arriving after user switched conversations
+        if (seq !== telemetryFetchSeq || detectConversationId() !== cid) return null;
         if (data && typeof data === "object") {
           telemetryData = data;
           renderToolbar();
@@ -2662,7 +2724,7 @@ svg {
       }
     } catch {}
     finally {
-      fetchInFlight = false;
+      if (seq === telemetryFetchSeq) fetchInFlight = false;
     }
     return telemetryData;
   }
@@ -2761,6 +2823,7 @@ svg {
       anchor.insertBefore(hostEl, beforeNode);
     }
 
+    syncConversationContext(true);
     syncCompactWidth(anchor);
     renderToolbar();
   }
